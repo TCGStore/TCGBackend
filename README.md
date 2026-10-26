@@ -12,11 +12,13 @@ Frontend (Next.js + Apollo Client)
    ▼
 BFF (NestJS + GraphQL) ──REST──► MCP server + agente (TypeScript) ──► Claude API
    │ gRPC                              │ gRPC (tools)
-   ├──► catalog-service   (Go + MongoDB)
-   ├──► orders-service    (Java Spring Boot + PostgreSQL)
-   └──► inventory-service (Python FastAPI + Redis)
+   ├──► catalog-service       (Go + MongoDB)
+   ├──► orders-service        (Java Spring Boot + PostgreSQL)
+   ├──► inventory-service     (Python FastAPI + Redis)
+   ├──► users-service         (C# .NET + PostgreSQL)
+   └──► notifications-service (TypeScript + MongoDB) ──► Mailpit
 
-orders-service ◄──RabbitMQ──► inventory-service
+RabbitMQ (exchange topic tcg.events): orders, inventory y notifications
 ```
 
 ## Estructura
@@ -28,6 +30,8 @@ orders-service ◄──RabbitMQ──► inventory-service
 | `services/catalog-service/` | Go + MongoDB |
 | `services/orders-service/` | Java Spring Boot + PostgreSQL |
 | `services/inventory-service/` | Python FastAPI + Redis |
+| `services/users-service/` | C# .NET + PostgreSQL |
+| `services/notifications-service/` | TypeScript + MongoDB |
 | `mcp-server/` | MCP server + agente (TypeScript) |
 | `proto/` | Contratos gRPC compartidos |
 | `k8s/` | Manifiestos de Kubernetes |
@@ -36,7 +40,7 @@ orders-service ◄──RabbitMQ──► inventory-service
 
 ```bash
 cp .env.example .env      # completa los valores
-docker compose up -d      # levanta MongoDB, PostgreSQL, Redis y RabbitMQ
+docker compose up -d      # levanta MongoDB, PostgreSQL, Redis, RabbitMQ y Mailpit
 ```
 
 ## Flujo de trabajo

@@ -4,7 +4,7 @@
 # Uso: cp .env.example .env && docker compose up -d
 
 services:
-  mongodb: # catalog-service
+  mongodb: # catalog-service y notifications-service (una base de datos cada uno)
     image: mongo:7
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER}
@@ -12,7 +12,7 @@ services:
     ports: ["27017:27017"]
     volumes: [mongo-data:/data/db]
 
-  postgres: # orders-service
+  postgres: # orders-service y users-service (una base de datos cada uno)
     image: postgres:16
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
@@ -25,7 +25,7 @@ services:
     image: redis:7
     ports: ["6379:6379"]
 
-  rabbitmq: # eventos orders <-> inventory
+  rabbitmq: # eventos entre orders, inventory y notifications
     image: rabbitmq:3-management
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
@@ -33,6 +33,12 @@ services:
     ports:
       - "5672:5672"   # AMQP (lo usan los servicios)
       - "15672:15672" # panel web: http://localhost:15672
+
+  mailpit: # correo falso para notifications-service
+    image: axllent/mailpit
+    ports:
+      - "1025:1025" # SMTP
+      - "8025:8025" # web para ver los correos: http://localhost:8025
 
 volumes:
   mongo-data:
