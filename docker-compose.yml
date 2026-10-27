@@ -41,6 +41,25 @@ services:
       rabbitmq:
         condition: service_healthy
 
+  orders-service:
+    build:
+      context: . # needs proto/ to compile
+      dockerfile: services/orders-service/Dockerfile
+    environment:
+      POSTGRES_URL: jdbc:postgresql://postgres:5432/orders
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      RABBITMQ_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672
+      CATALOG_GRPC_TARGET: catalog-service:50051
+    ports: ["50052:50052"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      catalog-service:
+        condition: service_started
+
   mongodb: # catalog-service y notifications-service (una base de datos cada uno)
     image: mongo:7
     environment:
