@@ -2,6 +2,7 @@
 #
 # Uso: cp .env.example .env && docker compose up -d
 # Datos de prueba del catálogo: docker compose run --rm --entrypoint /app/seed catalog-service
+# Stock inicial:                 docker compose run --rm inventory-service python -m inventory.seed
 
 services:
   catalog-service:
@@ -24,6 +25,20 @@ services:
     ports: ["50054:50054"]
     depends_on:
       postgres:
+        condition: service_healthy
+
+  inventory-service:
+    build:
+      context: . # needs proto/ to compile
+      dockerfile: services/inventory-service/Dockerfile
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      RABBITMQ_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672/
+    ports: ["50053:50053"]
+    depends_on:
+      redis:
+        condition: service_started
+      rabbitmq:
         condition: service_healthy
 
   mongodb: # catalog-service y notifications-service (una base de datos cada uno)
@@ -49,7 +64,9 @@ services:
 
   redis: # inventory-service
     image: redis:7
+    command: ["redis-server", "--appendonly", "yes"] # keeps stock across restarts
     ports: ["6379:6379"]
+    volumes: [redis-data:/data]
 
   rabbitmq: # eventos entre orders, inventory y notifications
     image: rabbitmq:3-management
@@ -59,6 +76,11 @@ services:
     ports:
       - "5672:5672"   # AMQP (lo usan los servicios)
       - "15672:15672" # panel web: http://localhost:15672
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_port_connectivity"]
+      start_period: 120s # the first boot is slow
+      interval: 5s
+      retries: 10
 
   mailpit: # correo falso para notifications-service
     image: axllent/mailpit
@@ -69,3 +91,4 @@ services:
 volumes:
   mongo-data:
   postgres-data:
+  redis-data:

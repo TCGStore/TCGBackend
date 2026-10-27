@@ -14,7 +14,7 @@ BFF (NestJS + GraphQL) ──REST──► MCP server + agente (TypeScript) ─�
    │ gRPC                              │ gRPC (tools)
    ├──► catalog-service       (Go + MongoDB)
    ├──► orders-service        (Java Spring Boot + PostgreSQL)
-   ├──► inventory-service     (Python FastAPI + Redis)
+   ├──► inventory-service     (Python + Redis)
    ├──► users-service         (C# .NET + PostgreSQL)
    └──► notifications-service (TypeScript + MongoDB) ──► Mailpit
 
@@ -29,7 +29,7 @@ RabbitMQ (exchange topic tcg.events): orders, inventory y notifications
 | `bff/` | NestJS + GraphQL |
 | `services/catalog-service/` | Go + MongoDB |
 | `services/orders-service/` | Java Spring Boot + PostgreSQL |
-| `services/inventory-service/` | Python FastAPI + Redis |
+| `services/inventory-service/` | Python + Redis |
 | `services/users-service/` | C# .NET + PostgreSQL |
 | `services/notifications-service/` | TypeScript + MongoDB |
 | `mcp-server/` | MCP server + agente (TypeScript) |
