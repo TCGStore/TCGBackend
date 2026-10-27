@@ -1,9 +1,17 @@
-# Desarrollo local. Por ahora solo levanta la infraestructura;
-# cada servicio se agregará aquí a medida que tenga su Dockerfile.
+# Desarrollo local. Cada servicio se agrega aquí cuando tiene su Dockerfile.
 #
 # Uso: cp .env.example .env && docker compose up -d
+# Datos de prueba del catálogo: docker compose run --rm --entrypoint /app/seed catalog-service
 
 services:
+  catalog-service:
+    build: ./services/catalog-service
+    environment:
+      MONGO_URI: mongodb://${MONGO_USER}:${MONGO_PASSWORD}@mongodb:27017
+      MONGO_DB: catalog
+    ports: ["50051:50051"]
+    depends_on: [mongodb]
+
   mongodb: # catalog-service y notifications-service (una base de datos cada uno)
     image: mongo:7
     environment:

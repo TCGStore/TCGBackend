@@ -1,0 +1,139 @@
+syntax = "proto3";
+
+package tcgstore.orders;
+
+option java_multiple_files = true;
+option java_package = "com.tcgstore.orders.grpc";
+
+// user_id comes from the JWT verified by the BFF; this service trusts it.
+// Requests for another user's order return NOT_FOUND.
+service OrdersService {
+  rpc GetCart(GetCartRequest) returns (Cart);
+  rpc AddCartItem(AddCartItemRequest) returns (Cart);
+  // Quantity 0 removes the item.
+  rpc UpdateCartItem(UpdateCartItemRequest) returns (Cart);
+  rpc ClearCart(ClearCartRequest) returns (Cart);
+
+  // Turns the cart into an order and empties it.
+  rpc Checkout(CheckoutRequest) returns (Order);
+  // Creates an order from explicit items without touching the cart (used by the AI agent).
+  rpc CreateOrder(CreateOrderRequest) returns (Order);
+  rpc GetOrder(GetOrderRequest) returns (Order);
+  rpc ListOrders(ListOrdersRequest) returns (ListOrdersResponse);
+}
+
+enum OrderStatus {
+  ORDER_STATUS_UNSPECIFIED = 0;
+  ORDER_STATUS_PENDING = 1;
+  ORDER_STATUS_CONFIRMED = 2;
+  ORDER_STATUS_CANCELLED = 3;
+}
+
+enum CancellationReason {
+  CANCELLATION_REASON_UNSPECIFIED = 0;
+  CANCELLATION_REASON_OUT_OF_STOCK = 1;
+  CANCELLATION_REASON_PAYMENT_DECLINED = 2;
+}
+
+message Address {
+  string recipient_name = 1;
+  string street = 2;
+  string city = 3;
+  string region = 4;
+  string postal_code = 5;
+  string country = 6;
+}
+
+// Cart prices are read from catalog-service on every request.
+message Cart {
+  string user_id = 1;
+  repeated CartItem items = 2;
+  int64 total_cents = 3;
+}
+
+message CartItem {
+  string product_id = 1;
+  string name = 2;
+  int64 unit_price_cents = 3;
+  int32 quantity = 4;
+  int64 subtotal_cents = 5;
+}
+
+// Item names and prices are copied when the order is created, so later
+// catalog changes don't alter past orders.
+message Order {
+  string id = 1;
+  string user_id = 2;
+  OrderStatus status = 3;
+  repeated OrderItem items = 4;
+  int64 total_cents = 5;
+  Address shipping_address = 6;
+  CancellationReason cancellation_reason = 7;
+  string created_at = 8;  // RFC 3339, e.g. "2026-10-26T18:00:00Z".
+  string updated_at = 9;
+}
+
+message OrderItem {
+  string product_id = 1;
+  string name = 2;
+  int64 unit_price_cents = 3;
+  int32 quantity = 4;
+  int64 subtotal_cents = 5;
+}
+
+message OrderItemInput {
+  string product_id = 1;
+  int32 quantity = 2;
+}
+
+message GetCartRequest {
+  string user_id = 1;
+}
+
+message AddCartItemRequest {
+  string user_id = 1;
+  string product_id = 2;
+  int32 quantity = 3;
+}
+
+message UpdateCartItemRequest {
+  string user_id = 1;
+  string product_id = 2;
+  int32 quantity = 3;
+}
+
+message ClearCartRequest {
+  string user_id = 1;
+}
+
+// user_email is stored with the order and sent in the events, so
+// notifications-service can email the customer without calling users-service.
+message CheckoutRequest {
+  string user_id = 1;
+  string user_email = 2;
+  Address shipping_address = 3;
+}
+
+message CreateOrderRequest {
+  string user_id = 1;
+  string user_email = 2;
+  Address shipping_address = 3;
+  repeated OrderItemInput items = 4;
+}
+
+message GetOrderRequest {
+  string user_id = 1;
+  string order_id = 2;
+}
+
+// Newest first.
+message ListOrdersRequest {
+  string user_id = 1;
+  int32 page = 2;       // 1-based. Defaults to 1.
+  int32 page_size = 3;  // Defaults to 20, max 100.
+}
+
+message ListOrdersResponse {
+  repeated Order orders = 1;
+  int32 total_count = 2;
+}

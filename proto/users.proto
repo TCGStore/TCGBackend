@@ -1,0 +1,68 @@
+syntax = "proto3";
+
+package tcgstore.users;
+
+option csharp_namespace = "TcgStore.Users.Grpc";
+
+// Token verification is not exposed: the BFF checks the JWT signature itself
+// with the shared JWT_SECRET (claims are described in README.md).
+service UsersService {
+  // Returns ALREADY_EXISTS if the email is taken.
+  rpc Register(RegisterRequest) returns (AuthResponse);
+  // Returns UNAUTHENTICATED for an unknown email or a wrong password, without saying which.
+  rpc Login(LoginRequest) returns (AuthResponse);
+  rpc GetProfile(GetProfileRequest) returns (User);
+  rpc UpdateProfile(UpdateProfileRequest) returns (User);
+}
+
+enum Role {
+  ROLE_UNSPECIFIED = 0;
+  ROLE_CUSTOMER = 1;
+  ROLE_ADMIN = 2;
+}
+
+message Address {
+  string recipient_name = 1;
+  string street = 2;
+  string city = 3;
+  string region = 4;
+  string postal_code = 5;
+  string country = 6;
+}
+
+message User {
+  string id = 1;
+  string email = 2;
+  string name = 3;
+  Role role = 4;
+  optional Address shipping_address = 5;
+  string created_at = 6;  // RFC 3339.
+}
+
+message RegisterRequest {
+  string email = 1;
+  string password = 2;
+  string name = 3;
+}
+
+message LoginRequest {
+  string email = 1;
+  string password = 2;
+}
+
+message AuthResponse {
+  string access_token = 1;
+  int64 expires_at = 2;  // Unix seconds, same value as the token's exp claim.
+  User user = 3;
+}
+
+message GetProfileRequest {
+  string user_id = 1;
+}
+
+// Email and role can't be changed here.
+message UpdateProfileRequest {
+  string user_id = 1;
+  string name = 2;
+  optional Address shipping_address = 3;
+}
