@@ -60,6 +60,28 @@ services:
       catalog-service:
         condition: service_started
 
+  notifications-service:
+    build:
+      context: . # needs proto/ at runtime
+      dockerfile: services/notifications-service/Dockerfile
+    environment:
+      MONGO_URI: mongodb://${MONGO_USER}:${MONGO_PASSWORD}@mongodb:27017
+      MONGO_DB: notifications
+      RABBITMQ_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672
+      SMTP_HOST: mailpit
+      SMTP_PORT: 1025
+      ADMIN_ALERT_EMAILS: ${ADMIN_EMAIL}
+    ports: ["50055:50055"]
+    # The service exits when it loses RabbitMQ; this brings it back with a new connection.
+    restart: on-failure
+    depends_on:
+      mongodb:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+
   mongodb: # catalog-service y notifications-service (una base de datos cada uno)
     image: mongo:7
     environment:
