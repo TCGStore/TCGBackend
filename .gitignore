@@ -38,3 +38,10 @@ venv/
 
 # Código generado desde proto/
 **/generated/
+
+# Contexto local de Claude Code (no se sube)
+CLAUDE.md
+
+# C# (users-service)
+/services/users-service/**/bin/
+/services/users-service/**/obj/
