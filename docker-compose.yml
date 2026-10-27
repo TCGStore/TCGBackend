@@ -12,6 +12,20 @@ services:
     ports: ["50051:50051"]
     depends_on: [mongodb]
 
+  users-service:
+    build:
+      context: . # needs proto/ to compile
+      dockerfile: services/users-service/Dockerfile
+    environment:
+      POSTGRES_CONNECTION: Host=postgres;Database=users;Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+    ports: ["50054:50054"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   mongodb: # catalog-service y notifications-service (una base de datos cada uno)
     image: mongo:7
     environment:
@@ -28,6 +42,10 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
     ports: ["5432:5432"]
     volumes: [postgres-data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      retries: 10
 
   redis: # inventory-service
     image: redis:7
