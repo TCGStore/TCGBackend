@@ -1,0 +1,111 @@
+syntax = "proto3";
+
+package tcgstore.catalog;
+
+option go_package = "github.com/Javiercatalanv/ArquitecturaSistemas/services/catalog-service/gen/catalogpb;catalogpb";
+option java_multiple_files = true;
+option java_package = "com.tcgstore.catalog.grpc";
+
+service CatalogService {
+  rpc GetProduct(GetProductRequest) returns (Product);
+  // Missing ids are skipped, so the response can be shorter than the request.
+  rpc GetProducts(GetProductsRequest) returns (GetProductsResponse);
+  rpc SearchProducts(SearchProductsRequest) returns (SearchProductsResponse);
+}
+
+enum ProductType {
+  PRODUCT_TYPE_UNSPECIFIED = 0;
+  PRODUCT_TYPE_CARD = 1;
+  PRODUCT_TYPE_BOOSTER_PACK = 2;
+  PRODUCT_TYPE_BOOSTER_BOX = 3;
+  PRODUCT_TYPE_ELITE_TRAINER_BOX = 4;
+}
+
+enum CardSupertype {
+  CARD_SUPERTYPE_UNSPECIFIED = 0;
+  CARD_SUPERTYPE_POKEMON = 1;
+  CARD_SUPERTYPE_TRAINER = 2;
+  CARD_SUPERTYPE_ENERGY = 3;
+}
+
+enum CardCondition {
+  CARD_CONDITION_UNSPECIFIED = 0;
+  CARD_CONDITION_NEAR_MINT = 1;
+  CARD_CONDITION_LIGHTLY_PLAYED = 2;
+  CARD_CONDITION_MODERATELY_PLAYED = 3;
+  CARD_CONDITION_HEAVILY_PLAYED = 4;
+  CARD_CONDITION_DAMAGED = 5;
+}
+
+// A product is one sellable listing: the same card in another condition,
+// language or grade is a different product with its own id and stock.
+message Product {
+  string id = 1;
+  string name = 2;
+  ProductType type = 3;
+  int64 price_cents = 4;
+  string image_url = 5;
+  string description = 6;
+
+  oneof details {
+    CardDetails card = 10;
+    SealedDetails sealed = 11;
+  }
+}
+
+message CardDetails {
+  string set_code = 1;
+  string set_name = 2;
+  string number = 3;          // As printed on the card, e.g. "025/165".
+  string rarity = 4;
+  string language = 5;        // ISO 639-1 code: "en", "ja", "es".
+  CardSupertype supertype = 6;
+  repeated string types = 7;  // Energy types, e.g. ["Fire"]. Empty for most trainers.
+  CardCondition condition = 8;
+  optional Grading grading = 9;
+}
+
+message Grading {
+  string company = 1;  // "PSA", "BGS", "CGC".
+  string grade = 2;    // String because some companies use half grades like "9.5".
+}
+
+message SealedDetails {
+  string set_code = 1;
+  string set_name = 2;
+  string language = 3;
+}
+
+message GetProductRequest {
+  string id = 1;
+}
+
+message GetProductsRequest {
+  repeated string ids = 1;
+}
+
+message GetProductsResponse {
+  repeated Product products = 1;
+}
+
+// Unset filters are ignored.
+message SearchProductsRequest {
+  string query = 1;  // Matched against the product name.
+  ProductType type = 2;
+  string set_code = 3;
+  string language = 4;
+  CardSupertype supertype = 5;
+  string energy_type = 6;  // Matches any value in CardDetails.types.
+  CardCondition condition = 7;
+  optional int64 min_price_cents = 8;
+  optional int64 max_price_cents = 9;
+  bool graded_only = 10;
+
+  int32 page = 20;       // 1-based. Defaults to 1.
+  int32 page_size = 21;  // Defaults to 20, max 100.
+}
+
+message SearchProductsResponse {
+  repeated Product products = 1;
+  int32 total_count = 2;
+}
