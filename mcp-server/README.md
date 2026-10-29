@@ -59,7 +59,7 @@ Diferencias con los servicios, pensadas para la IA:
 | Método | Ruta | Para qué |
 |---|---|---|
 | `POST` | `/mcp` | Protocolo MCP (Streamable HTTP, sin sesión: un servidor nuevo por petición) |
-| `POST` | `/actions/{id}/confirm` | Ejecuta una acción pendiente. Responde el pedido o el stock nuevo |
+| `POST` | `/actions/{id}/confirm` | Ejecuta una acción pendiente. Responde `{ kind, result }`: `checkout` con el pedido, `set_stock` con el stock nuevo |
 | `POST` | `/actions/{id}/cancel` | La descarta |
 | `GET` | `/health` | Para Kubernetes |
 
@@ -116,7 +116,9 @@ conversando, sin el agente ni la API key (útil para la presentación).
 
 3. En Claude Code: *"busca cartas de tipo agua bajo 30 dólares y agrega la más barata al
    carrito"*.
-4. Para confirmar una compra (mientras no exista el botón del frontend):
+4. Para confirmar una compra (mientras no exista el botón del frontend), en GraphiQL del BFF
+   con el mismo token: `mutation { confirmAction(actionId: "<actionId>") { order { id status } } }`.
+   O directo al MCP:
 
    ```bash
    curl -X POST http://localhost:4100/actions/<actionId>/confirm -H "Authorization: Bearer <token>"

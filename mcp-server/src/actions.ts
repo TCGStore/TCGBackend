@@ -45,9 +45,9 @@ export class PendingActions {
   }
 
   /** Runs the action once; a second confirm finds nothing. */
-  async confirm(identity: Identity, actionId: string): Promise<object> {
+  async confirm(identity: Identity, actionId: string): Promise<{ kind: string; result: object }> {
     const action = this.take(identity, actionId);
-    return action.execute();
+    return { kind: action.kind, result: await action.execute() };
   }
 
   cancel(identity: Identity, actionId: string): void {

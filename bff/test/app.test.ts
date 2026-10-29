@@ -7,11 +7,13 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { AppModule } from "../src/app.module";
 import type { Config } from "../src/config";
+import { startFakeMcp } from "./fake-mcp";
 import { PROTO_DIR, startFakeServices } from "./fake-services";
 
 const SECRET = "test-secret-with-at-least-32-characters";
 
 let services: Awaited<ReturnType<typeof startFakeServices>>;
+let mcp: Awaited<ReturnType<typeof startFakeMcp>>;
 let app: INestApplication;
 let url: string;
 
@@ -22,6 +24,7 @@ function configFor(target: string, overrides: Partial<Config["targets"]> = {}): 
     corsOrigins: [],
     protoDir: PROTO_DIR,
     grpcDeadlineMs: 2000,
+    mcpUrl: mcp.url,
     targets: { catalog: target, orders: target, inventory: target, users: target, notifications: target, ...overrides },
   };
 }
@@ -55,16 +58,19 @@ function callsTo(method: string) {
 
 beforeAll(async () => {
   services = await startFakeServices();
+  mcp = await startFakeMcp();
   ({ instance: app, url } = await startApp(configFor(services.target)));
 });
 
 afterAll(async () => {
   await app?.close();
   services?.stop();
+  mcp?.stop();
 });
 
 beforeEach(() => {
   services.calls.length = 0;
+  mcp.requests.length = 0;
 });
 
 describe("catalog", () => {
@@ -214,5 +220,66 @@ describe("orders", () => {
 
     expect(errors).toBeUndefined();
     expect(data.order).toBeNull();
+  });
+});
+
+describe("assistant actions", () => {
+  it("confirms a purchase with the user's token and returns the order", async () => {
+    const token = tokenFor("customer");
+    const { data, errors } = await gql(`mutation { confirmAction(actionId: "act_checkout") { kind order { id status } stock { available } } }`, {
+      token,
+    });
+
+    expect(errors).toBeUndefined();
+    expect(data.confirmAction).toEqual({ kind: "CHECKOUT", order: { id: "ord_1", status: "PENDING" }, stock: null });
+    expect(mcp.requests).toEqual([{ path: "/actions/act_checkout/confirm", authorization: `Bearer ${token}` }]);
+    expect(callsTo("OrdersService.GetOrder")[0]!.request).toMatchObject({ userId: "usr_ash", orderId: "ord_1" });
+  });
+
+  it("returns the current stock after a stock change", async () => {
+    const { data } = await gql(`mutation { confirmAction(actionId: "act_stock") { kind stock { productId available } } }`, {
+      token: tokenFor("admin"),
+    });
+
+    expect(data.confirmAction).toEqual({ kind: "SET_STOCK", stock: { productId: "prd_etb", available: 3 } });
+  });
+
+  it("maps mcp-server errors to GraphQL codes", async () => {
+    const token = tokenFor("customer");
+    const expired = await gql(`mutation { confirmAction(actionId: "act_old") { kind } }`, { token });
+    const changed = await gql(`mutation { confirmAction(actionId: "act_changed") { kind } }`, { token });
+
+    expect(expired.errors?.[0]).toMatchObject({ extensions: { code: "NOT_FOUND" } });
+    expect(changed.errors?.[0]).toMatchObject({
+      message: "the cart changed after the purchase was prepared: prepare it again",
+      extensions: { code: "FAILED_PRECONDITION" },
+    });
+  });
+
+  it("cancels an action", async () => {
+    const { data } = await gql(`mutation { cancelAction(actionId: "act_checkout") }`, { token: tokenFor("customer") });
+
+    expect(data.cancelAction).toBe(true);
+    expect(mcp.requests[0]!.path).toBe("/actions/act_checkout/cancel");
+  });
+
+  it("doesn't call the mcp-server without a valid token", async () => {
+    const { errors } = await gql(`mutation { confirmAction(actionId: "act_checkout") { kind } }`);
+
+    expect(errors?.[0]?.extensions.code).toBe("UNAUTHENTICATED");
+    expect(mcp.requests).toHaveLength(0);
+  });
+
+  it("reports SERVICE_UNAVAILABLE when the mcp-server is down", async () => {
+    const down = await startApp({ ...configFor(services.target), mcpUrl: "http://127.0.0.1:1" });
+    try {
+      const { errors } = await gql(`mutation { confirmAction(actionId: "act_checkout") { kind } }`, {
+        token: tokenFor("customer"),
+        url: down.url,
+      });
+      expect(errors?.[0]).toMatchObject({ message: "mcp-server is unavailable", extensions: { code: "SERVICE_UNAVAILABLE" } });
+    } finally {
+      await down.instance.close();
+    }
   });
 });

@@ -166,7 +166,10 @@ describe("cart and orders", () => {
     expect(otherUser.status).toBe(404);
 
     const confirmed = await postAction(`/actions/${pending.actionId}/confirm`, token);
-    expect(confirmed).toMatchObject({ status: 200, body: { id: "ord_new", status: "PENDING", total_usd: 149.99 } });
+    expect(confirmed).toMatchObject({
+      status: 200,
+      body: { kind: "checkout", result: { id: "ord_new", status: "PENDING", total_usd: 149.99 } },
+    });
     expect(callsTo("OrdersService.Checkout")[0]!.request).toMatchObject({ userId: "usr_misty", userEmail: "misty@example.com" });
 
     const again = await postAction(`/actions/${pending.actionId}/confirm`, token);

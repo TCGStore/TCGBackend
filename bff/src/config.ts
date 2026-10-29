@@ -6,6 +6,7 @@ export interface Config {
   corsOrigins: string[];
   protoDir: string;
   grpcDeadlineMs: number;
+  mcpUrl: string;
   targets: {
     catalog: string;
     orders: string;
@@ -25,6 +26,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       .filter(Boolean),
     protoDir: env.PROTO_DIR ?? "../proto",
     grpcDeadlineMs: Number(env.GRPC_DEADLINE_MS ?? 5000),
+    mcpUrl: env.MCP_URL ?? "http://localhost:4100",
     targets: {
       catalog: env.CATALOG_GRPC_TARGET ?? "localhost:50051",
       orders: env.ORDERS_GRPC_TARGET ?? "localhost:50052",

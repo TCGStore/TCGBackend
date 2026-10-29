@@ -57,6 +57,15 @@ type Mutation {
 
   "Requires login. Placeholder until the AI agent (mcp-server) is ready."
   chat(message: String!, conversationId: ID): ChatReply!
+  """
+  Requires login. Runs a purchase or stock change that the assistant prepared; call it
+  from the "Confirm" button. Each action runs once and expires after 10 minutes
+  (NOT_FOUND after that). FAILED_PRECONDITION if the cart changed in between: ask
+  the assistant to prepare it again.
+  """
+  confirmAction(actionId: ID!): ConfirmedAction!
+  "Requires login. Discards a prepared action (the \"Cancel\" button)."
+  cancelAction(actionId: ID!): Boolean!
 }
 
 # --- Catalog ---
@@ -296,6 +305,20 @@ type NotificationPage {
 }
 
 # --- AI agent ---
+
+enum ActionKind {
+  CHECKOUT
+  "Admins only."
+  SET_STOCK
+}
+
+type ConfirmedAction {
+  kind: ActionKind!
+  "Set when kind is CHECKOUT. It starts as PENDING, like the checkout mutation."
+  order: Order
+  "Set when kind is SET_STOCK."
+  stock: Stock
+}
 
 type ChatReply {
   "Send it back in the next message to continue the same conversation."

@@ -9,6 +9,7 @@ import type { Request } from "express";
 import { CONFIG, type Config } from "./config";
 import { createLoaders, type GraphQLContext } from "./graphql/context";
 import { GrpcClients } from "./grpc/clients";
+import { McpClient } from "./mcp/mcp.client";
 import { CartItemResolver, CatalogResolver, OrderItemResolver, ProductResolver } from "./resolvers/catalog.resolver";
 import { ChatResolver } from "./resolvers/chat.resolver";
 import { NotificationsResolver } from "./resolvers/notifications.resolver";
@@ -34,7 +35,7 @@ export class AppModule {
     const grpcModule: DynamicModule = {
       module: GrpcModule,
       providers: [{ provide: CONFIG, useValue: config }, GrpcClients],
-      exports: [GrpcClients],
+      exports: [GrpcClients, CONFIG],
     };
 
     return {
@@ -58,6 +59,7 @@ export class AppModule {
       ],
       controllers: [HealthController],
       providers: [
+        McpClient,
         CatalogResolver,
         ProductResolver,
         CartItemResolver,

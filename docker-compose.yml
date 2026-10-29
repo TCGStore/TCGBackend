@@ -93,8 +93,10 @@ services:
       INVENTORY_GRPC_TARGET: inventory-service:50053
       USERS_GRPC_TARGET: users-service:50054
       NOTIFICATIONS_GRPC_TARGET: notifications-service:50055
+      MCP_URL: http://mcp-server:4100
     ports: ["4000:4000"]
     depends_on:
+      - mcp-server
       - catalog-service
       - orders-service
       - inventory-service

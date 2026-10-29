@@ -1,7 +1,8 @@
 # bff
 
 API Gateway / BFF en NestJS + GraphQL (Apollo). Es lo único con lo que habla el
-frontend: traduce cada consulta GraphQL a llamadas gRPC a los microservicios.
+frontend: traduce cada consulta GraphQL a llamadas gRPC a los microservicios, y por
+REST al mcp-server para las acciones del asistente.
 Escucha en el puerto **4000** (`/graphql`, y `/health` para Kubernetes).
 
 ## El contrato: `schema.graphql`
@@ -50,6 +51,7 @@ src/
   grpc/types.ts        mensajes de proto/ en TypeScript
   graphql/context.ts   DataLoaders (agrupan llamadas, ver abajo)
   graphql/mappers.ts   mensaje gRPC → tipo GraphQL
+  mcp/mcp.client.ts    cliente REST del mcp-server
   resolvers/           un resolver por área: catálogo, usuarios, pedidos, notificaciones, chat
 test/                  vitest: la app real contra un servidor gRPC falso con los 5 servicios
 ```
@@ -76,10 +78,22 @@ JWT (orders-service lo manda en los eventos para que notifications-service enví
 correos). El pedido nace `PENDING` y pasa a `CONFIRMED` o `CANCELLED` un momento después
 (la saga por RabbitMQ): el frontend puede consultar `order(id)` o mirar las notificaciones.
 
-### Chat
+### Chat y acciones del asistente
 
 `chat` responde un texto fijo por ahora, para que el frontend pueda armar la interfaz.
 Cuando exista el agente, reenviará el mensaje al mcp-server (`POST /chat`).
+
+Cuando el asistente prepara una compra o un cambio de stock, no la ejecuta: devuelve un
+`actionId` (ver `mcp-server/README.md`). El frontend muestra una tarjeta con los botones:
+
+- **Confirmar** → `confirmAction(actionId)`. Devuelve `kind` y el `order` creado (o el
+  `stock` nuevo, si era un admin cambiando stock).
+- **Cancelar** → `cancelAction(actionId)`.
+
+El BFF las reenvía por REST al mcp-server (`POST /actions/{id}/confirm|cancel`) con el
+mismo JWT del usuario, y el mcp-server vuelve a verificar que la acción sea suya. Errores:
+`NOT_FOUND` si ya se usó o venció (10 minutos), `FAILED_PRECONDITION` si el carrito cambió
+desde que se preparó la compra.
 
 ## Correr en local
 
@@ -103,6 +117,7 @@ O todo con Docker desde la raíz: `docker compose up -d --build bff`.
 | `CORS_ORIGINS` | `http://localhost:3000` | Orígenes del frontend, separados por coma |
 | `PROTO_DIR` | `../proto` | |
 | `GRPC_DEADLINE_MS` | `5000` | Tiempo máximo de cada llamada gRPC |
+| `MCP_URL` | `http://localhost:4100` | API REST del mcp-server |
 | `CATALOG_GRPC_TARGET` … `NOTIFICATIONS_GRPC_TARGET` | `localhost:50051` … `50055` | Dirección de cada servicio |
 
 ### Ejemplo de compra completa
