@@ -101,6 +101,25 @@ services:
       - users-service
       - notifications-service
 
+  mcp-server: # tools del agente: http://localhost:4100/mcp
+    build:
+      context: . # needs proto/ at runtime
+      dockerfile: mcp-server/Dockerfile
+    environment:
+      JWT_SECRET: ${JWT_SECRET}
+      CATALOG_GRPC_TARGET: catalog-service:50051
+      ORDERS_GRPC_TARGET: orders-service:50052
+      INVENTORY_GRPC_TARGET: inventory-service:50053
+      USERS_GRPC_TARGET: users-service:50054
+      NOTIFICATIONS_GRPC_TARGET: notifications-service:50055
+    ports: ["4100:4100"]
+    depends_on:
+      - catalog-service
+      - orders-service
+      - inventory-service
+      - users-service
+      - notifications-service
+
   mongodb: # catalog-service y notifications-service (una base de datos cada uno)
     image: mongo:7
     environment:
