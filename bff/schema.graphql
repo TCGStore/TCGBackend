@@ -1,0 +1,304 @@
+"""
+Contract between the frontend and the BFF. Same conventions as proto/README.md:
+money in integer cents (USD) and dates as RFC 3339 strings.
+
+Operations marked "Requires login" need the header `Authorization: Bearer <token>`
+with the token returned by `login` or `register`. Errors carry `extensions.code`:
+UNAUTHENTICATED, FORBIDDEN, BAD_USER_INPUT, NOT_FOUND, ALREADY_EXISTS,
+FAILED_PRECONDITION, SERVICE_UNAVAILABLE or INTERNAL_SERVER_ERROR.
+"""
+type Query {
+  "Unset filters are ignored. pageSize max 100."
+  products(filter: ProductFilter, page: Int = 1, pageSize: Int = 20): ProductPage!
+  "Null if the product doesn't exist."
+  product(id: ID!): Product
+
+  "Requires login."
+  me: User!
+  "Requires login. Prices are always the current catalog prices."
+  cart: Cart!
+  "Requires login. Newest first."
+  orders(page: Int = 1, pageSize: Int = 20): OrderPage!
+  "Requires login. Null if the order doesn't exist or belongs to another user."
+  order(id: ID!): Order
+  "Requires login. Admins also get the shared low stock alerts."
+  notifications(unreadOnly: Boolean = false, page: Int = 1, pageSize: Int = 20): NotificationPage!
+  "Requires login. For the bell counter."
+  unreadNotificationCount: Int!
+}
+
+type Mutation {
+  "Returns ALREADY_EXISTS if the email is taken."
+  register(input: RegisterInput!): AuthPayload!
+  "Returns UNAUTHENTICATED for a wrong email or password."
+  login(email: String!, password: String!): AuthPayload!
+  "Requires login. Fields left out keep their current value."
+  updateProfile(input: UpdateProfileInput!): User!
+
+  "Requires login. Adds to the quantity already in the cart."
+  addToCart(productId: ID!, quantity: Int! = 1): Cart!
+  "Requires login. Quantity 0 removes the item."
+  updateCartItem(productId: ID!, quantity: Int!): Cart!
+  "Requires login."
+  clearCart: Cart!
+  """
+  Requires login. Turns the cart into a PENDING order and empties the cart.
+  Without shippingAddress, the profile's address is used.
+  The order becomes CONFIRMED or CANCELLED a moment later: poll `order(id)`
+  or watch the notifications.
+  """
+  checkout(shippingAddress: AddressInput): Order!
+
+  "Requires login. Without ids, marks all of them as read. Returns how many changed."
+  markNotificationsRead(ids: [ID!]): Int!
+
+  "Requires an admin. Sets the units available for sale."
+  setStock(productId: ID!, available: Int!): Stock!
+
+  "Requires login. Placeholder until the AI agent (mcp-server) is ready."
+  chat(message: String!, conversationId: ID): ChatReply!
+}
+
+# --- Catalog ---
+
+enum ProductType {
+  CARD
+  BOOSTER_PACK
+  BOOSTER_BOX
+  ELITE_TRAINER_BOX
+}
+
+enum CardSupertype {
+  POKEMON
+  TRAINER
+  ENERGY
+}
+
+enum CardCondition {
+  NEAR_MINT
+  LIGHTLY_PLAYED
+  MODERATELY_PLAYED
+  HEAVILY_PLAYED
+  DAMAGED
+}
+
+"""
+One sellable listing: the same card in another condition, language or grade is a
+different product with its own id and stock.
+"""
+type Product {
+  id: ID!
+  name: String!
+  type: ProductType!
+  priceCents: Int!
+  imageUrl: String
+  description: String
+  "Set only when type is CARD."
+  card: CardDetails
+  "Set for sealed products (packs and boxes)."
+  sealed: SealedDetails
+  "Null if inventory-service is down, so the catalog still loads."
+  stock: Stock
+}
+
+type CardDetails {
+  setCode: String!
+  setName: String!
+  "As printed on the card, e.g. \"025/165\"."
+  number: String!
+  rarity: String!
+  "ISO 639-1 code: en, ja, es."
+  language: String!
+  supertype: CardSupertype!
+  "Energy types, e.g. [\"Fire\"]. Empty for most trainers."
+  types: [String!]!
+  condition: CardCondition!
+  grading: Grading
+}
+
+type Grading {
+  "PSA, BGS or CGC."
+  company: String!
+  "String because some companies use half grades like \"9.5\"."
+  grade: String!
+}
+
+type SealedDetails {
+  setCode: String!
+  setName: String!
+  language: String!
+}
+
+type Stock {
+  productId: ID!
+  "Units that can still be bought."
+  available: Int!
+  "Units held by orders waiting for payment."
+  reserved: Int!
+  lowStock: Boolean!
+}
+
+input ProductFilter {
+  "Matched against the product name."
+  query: String
+  type: ProductType
+  setCode: String
+  language: String
+  supertype: CardSupertype
+  "Matches any of the card's energy types, e.g. \"Water\"."
+  energyType: String
+  condition: CardCondition
+  minPriceCents: Int
+  maxPriceCents: Int
+  gradedOnly: Boolean
+}
+
+type ProductPage {
+  items: [Product!]!
+  totalCount: Int!
+}
+
+# --- Users ---
+
+enum Role {
+  CUSTOMER
+  ADMIN
+}
+
+type User {
+  id: ID!
+  email: String!
+  name: String!
+  role: Role!
+  shippingAddress: Address
+  createdAt: String!
+}
+
+type AuthPayload {
+  "JWT for the Authorization header. Valid for 24 hours."
+  token: String!
+  expiresAt: String!
+  user: User!
+}
+
+input RegisterInput {
+  email: String!
+  password: String!
+  name: String!
+}
+
+input UpdateProfileInput {
+  name: String
+  shippingAddress: AddressInput
+}
+
+type Address {
+  recipientName: String!
+  street: String!
+  city: String!
+  region: String!
+  postalCode: String!
+  country: String!
+}
+
+input AddressInput {
+  recipientName: String!
+  street: String!
+  city: String!
+  region: String!
+  postalCode: String!
+  country: String!
+}
+
+# --- Cart and orders ---
+
+type Cart {
+  items: [CartItem!]!
+  totalCents: Int!
+}
+
+type CartItem {
+  productId: ID!
+  name: String!
+  unitPriceCents: Int!
+  quantity: Int!
+  subtotalCents: Int!
+  "For the image and details. Null if it was removed from the catalog."
+  product: Product
+}
+
+enum OrderStatus {
+  "Waiting for the stock reservation and the payment."
+  PENDING
+  CONFIRMED
+  CANCELLED
+}
+
+enum CancellationReason {
+  OUT_OF_STOCK
+  PAYMENT_DECLINED
+}
+
+type Order {
+  id: ID!
+  status: OrderStatus!
+  items: [OrderItem!]!
+  totalCents: Int!
+  shippingAddress: Address!
+  "Set only when status is CANCELLED."
+  cancellationReason: CancellationReason
+  createdAt: String!
+  updatedAt: String!
+}
+
+"Name and price as they were when the order was created."
+type OrderItem {
+  productId: ID!
+  name: String!
+  unitPriceCents: Int!
+  quantity: Int!
+  subtotalCents: Int!
+  "Current catalog data. Null if it was removed from the catalog."
+  product: Product
+}
+
+type OrderPage {
+  items: [Order!]!
+  totalCount: Int!
+}
+
+# --- Notifications ---
+
+enum NotificationType {
+  ORDER_CREATED
+  ORDER_CONFIRMED
+  ORDER_CANCELLED
+  "Admins only."
+  LOW_STOCK
+}
+
+type Notification {
+  id: ID!
+  type: NotificationType!
+  title: String!
+  message: String!
+  read: Boolean!
+  createdAt: String!
+  "Set for order notifications."
+  orderId: ID
+  "Set for low stock notifications."
+  productId: ID
+}
+
+type NotificationPage {
+  items: [Notification!]!
+  totalCount: Int!
+}
+
+# --- AI agent ---
+
+type ChatReply {
+  "Send it back in the next message to continue the same conversation."
+  conversationId: ID!
+  reply: String!
+}
