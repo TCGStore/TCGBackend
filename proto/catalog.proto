@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package tcgstore.catalog;
 
-option go_package = "github.com/Javiercatalanv/ArquitecturaSistemas/services/catalog-service/gen/catalogpb;catalogpb";
+option go_package = "github.com/TCGStore/TCGCatalogService/gen/catalogpb;catalogpb";
 option java_multiple_files = true;
 option java_package = "com.tcgstore.catalog.grpc";
 

@@ -9,39 +9,11 @@
 .vscode/
 *.swp
 
-# Node (frontend, bff, mcp-server)
+# Node (bff, mcp-server)
 node_modules/
 dist/
-.next/
-out/
 coverage/
 npm-debug.log*
-yarn-error.log*
-
-# Go (catalog-service)
-/services/catalog-service/bin/
-*.exe
-*.test
-
-# Java (orders-service)
-target/
-*.class
-.gradle/
-build/
-
-# Python (inventory-service)
-__pycache__/
-*.py[cod]
-.venv/
-venv/
-.pytest_cache/
-
-# Código generado desde proto/
-**/generated/
 
 # Contexto local de Claude Code (no se sube)
 CLAUDE.md
-
-# C# (users-service)
-/services/users-service/**/bin/
-/services/users-service/**/obj/

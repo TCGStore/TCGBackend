@@ -1,4 +1,5 @@
-# Desarrollo local. Cada servicio se agrega aquí cuando tiene su Dockerfile.
+# Desarrollo local. Los microservicios se construyen desde los repos hermanos,
+# así que todos deben estar clonados en la misma carpeta (ver README.md).
 #
 # Uso: cp .env.example .env && docker compose up -d
 # Datos de prueba del catálogo: docker compose run --rm --entrypoint /app/seed catalog-service
@@ -6,7 +7,7 @@
 
 services:
   catalog-service:
-    build: ./services/catalog-service
+    build: ../TCGCatalogService
     environment:
       MONGO_URI: mongodb://${MONGO_USER}:${MONGO_PASSWORD}@mongodb:27017
       MONGO_DB: catalog
@@ -14,9 +15,7 @@ services:
     depends_on: [mongodb]
 
   users-service:
-    build:
-      context: . # needs proto/ to compile
-      dockerfile: services/users-service/Dockerfile
+    build: ../TCGUserService
     environment:
       POSTGRES_CONNECTION: Host=postgres;Database=users;Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
       JWT_SECRET: ${JWT_SECRET}
@@ -28,9 +27,7 @@ services:
         condition: service_healthy
 
   inventory-service:
-    build:
-      context: . # needs proto/ to compile
-      dockerfile: services/inventory-service/Dockerfile
+    build: ../TCGInventoryService
     environment:
       REDIS_URL: redis://redis:6379/0
       RABBITMQ_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672/
@@ -42,9 +39,7 @@ services:
         condition: service_healthy
 
   orders-service:
-    build:
-      context: . # needs proto/ to compile
-      dockerfile: services/orders-service/Dockerfile
+    build: ../TCGOrderService
     environment:
       POSTGRES_URL: jdbc:postgresql://postgres:5432/orders
       POSTGRES_USER: ${POSTGRES_USER}
@@ -61,9 +56,7 @@ services:
         condition: service_started
 
   notifications-service:
-    build:
-      context: . # needs proto/ at runtime
-      dockerfile: services/notifications-service/Dockerfile
+    build: ../TCGNotificationService
     environment:
       MONGO_URI: mongodb://${MONGO_USER}:${MONGO_PASSWORD}@mongodb:27017
       MONGO_DB: notifications

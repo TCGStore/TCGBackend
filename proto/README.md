@@ -2,6 +2,9 @@
 
 Contratos compartidos por el BFF, el MCP server y los microservicios.
 
+Esta carpeta es la **fuente de verdad**. Cada microservicio guarda en su propio repo
+(carpeta `proto/`) una copia de los archivos que usa; no se editan allá.
+
 | Archivo | Servidor | Clientes |
 |---|---|---|
 | `catalog.proto` | catalog-service (Go) | BFF, MCP, orders-service |
@@ -12,6 +15,8 @@ Contratos compartidos por el BFF, el MCP server y los microservicios.
 | `events.md` | Eventos de RabbitMQ (no son gRPC) | orders, inventory, notifications |
 
 Cualquier cambio aquí afecta a varios servicios: se acuerda con el equipo antes de hacer merge.
+Después del merge, `./scripts/sync-proto.sh` copia los archivos a los repos de los servicios
+(clonados junto a este) y se abre un PR en cada uno que haya cambiado.
 
 ## Convenciones
 

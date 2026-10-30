@@ -21,26 +21,50 @@ BFF (NestJS + GraphQL) ──REST──► MCP server + agente (TypeScript) ─�
 RabbitMQ (exchange topic tcg.events): orders, inventory y notifications
 ```
 
-## Estructura
+## Repositorios
+
+El proyecto está separado en siete repositorios:
+
+| Repo | Contenido |
+|---|---|
+| [TCGFrontend](https://github.com/TCGStore/TCGFrontend) | Next.js |
+| [TCGBackend](https://github.com/TCGStore/TCGBackend) (este) | BFF, MCP server, contratos (`proto/`), `docker-compose.yml` y `k8s/` |
+| [TCGCatalogService](https://github.com/TCGStore/TCGCatalogService) | Go + MongoDB |
+| [TCGOrderService](https://github.com/TCGStore/TCGOrderService) | Java Spring Boot + PostgreSQL |
+| [TCGInventoryService](https://github.com/TCGStore/TCGInventoryService) | Python + Redis |
+| [TCGUserService](https://github.com/TCGStore/TCGUserService) | C# .NET + PostgreSQL |
+| [TCGNotificationService](https://github.com/TCGStore/TCGNotificationService) | TypeScript + MongoDB |
+
+Estructura de este repo:
 
 | Carpeta | Contenido |
 |---|---|
-| `frontend/` | Next.js |
 | `bff/` | NestJS + GraphQL |
-| `services/catalog-service/` | Go + MongoDB |
-| `services/orders-service/` | Java Spring Boot + PostgreSQL |
-| `services/inventory-service/` | Python + Redis |
-| `services/users-service/` | C# .NET + PostgreSQL |
-| `services/notifications-service/` | TypeScript + MongoDB |
 | `mcp-server/` | MCP server + agente (TypeScript) |
-| `proto/` | Contratos gRPC compartidos |
+| `proto/` | Contratos gRPC y eventos (fuente de verdad, ver `proto/README.md`) |
+| `scripts/sync-proto.sh` | Copia los contratos a los repos de los servicios |
 | `k8s/` | Manifiestos de Kubernetes |
 
 ## Desarrollo local
 
+`docker-compose.yml` construye los microservicios desde los repos hermanos, así que
+los siete deben estar clonados en la misma carpeta:
+
+```
+pokemon-tcg-store/
+├── TCGBackend/
+├── TCGFrontend/
+├── TCGCatalogService/
+├── TCGOrderService/
+├── TCGInventoryService/
+├── TCGUserService/
+└── TCGNotificationService/
+```
+
 ```bash
+# desde TCGBackend/
 cp .env.example .env      # completa los valores
-docker compose up -d      # levanta MongoDB, PostgreSQL, Redis, RabbitMQ y Mailpit
+docker compose up -d      # levanta los servicios, el BFF, el MCP y la infraestructura
 ```
 
 ## Flujo de trabajo
