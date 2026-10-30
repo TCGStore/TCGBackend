@@ -80,11 +80,28 @@ correos). El pedido nace `PENDING` y pasa a `CONFIRMED` o `CANCELLED` un momento
 
 ### Chat y acciones del asistente
 
-`chat` responde un texto fijo por ahora, para que el frontend pueda armar la interfaz.
-Cuando exista el agente, reenviará el mensaje al mcp-server (`POST /chat`).
+`chat(message, conversationId)` reenvía el mensaje al agente del mcp-server (`POST /chat`)
+con el JWT del usuario. Devuelve la respuesta (`reply`), el `conversationId` que hay que
+mandar en el siguiente mensaje para seguir la misma conversación, y `actions`.
 
-Cuando el asistente prepara una compra o un cambio de stock, no la ejecuta: devuelve un
-`actionId` (ver `mcp-server/README.md`). El frontend muestra una tarjeta con los botones:
+```graphql
+mutation {
+  chat(message: "busca cartas de tipo agua bajo 30 dólares") {
+    conversationId
+    reply
+    actions { actionId kind summary expiresAt }
+  }
+}
+```
+
+Una respuesta puede tardar varios segundos (el agente consulta los servicios entre medio),
+así que conviene mostrar un "escribiendo...". Errores: `SERVICE_UNAVAILABLE` si Claude no
+responde o falta la API key, `FAILED_PRECONDITION` si se manda otro mensaje a la misma
+conversación antes de recibir la respuesta anterior.
+
+Cuando el asistente prepara una compra o un cambio de stock, no la ejecuta: la devuelve en
+`actions`, con un `actionId` (ver `mcp-server/README.md`). El frontend muestra una tarjeta
+con el `summary` y los botones:
 
 - **Confirmar** → `confirmAction(actionId)`. Devuelve `kind` y el `order` creado (o el
   `stock` nuevo, si era un admin cambiando stock).

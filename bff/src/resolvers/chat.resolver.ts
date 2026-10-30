@@ -1,5 +1,3 @@
-import { randomUUID } from "node:crypto";
-
 import { UseGuards } from "@nestjs/common";
 import { Args, Context, Mutation, Resolver } from "@nestjs/graphql";
 
@@ -17,14 +15,14 @@ export class ChatResolver {
     private readonly grpc: GrpcClients,
   ) {}
 
-  // Fixed reply so the frontend can build the chat now. It will forward the
-  // message to the mcp-server (POST /chat) once the agent exists.
   @Mutation()
-  chat(@Args("conversationId") conversationId: string | null) {
-    return {
-      conversationId: conversationId ?? randomUUID(),
-      reply: "El asistente todavía no está disponible. ¡Pronto podrás pedirle cartas y mazos!",
-    };
+  async chat(
+    @Args("message") message: string,
+    @Args("conversationId") conversationId: string | null,
+    @Context() ctx: GraphQLContext,
+  ) {
+    const { actions, ...reply } = await this.mcp.chat(ctx.req.headers.authorization!, message, conversationId ?? undefined);
+    return { ...reply, actions: actions.map((action) => ({ ...action, kind: action.kind.toUpperCase() })) };
   }
 
   @Mutation()

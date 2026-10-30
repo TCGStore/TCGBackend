@@ -56,6 +56,7 @@ export const checkout = defineTool({
     "that the user must confirm with a button in the store. Never tell the user the purchase is done " +
     "after calling this. Without shipping_address, the address saved in the user's profile is used.",
   readOnly: false,
+  needsConfirmation: true,
   inputSchema: z.object({ shipping_address: address.optional() }),
   async run({ shipping_address }, { grpc, identity, actions }) {
     const cart = await grpc.orders.getCart({ userId: identity.userId });

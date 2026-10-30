@@ -23,4 +23,4 @@ export function toolsFor(identity: Identity): Tool<any>[] {
   return TOOLS.filter((tool) => !tool.adminOnly || identity.role === "admin");
 }
 
-export type { Tool, ToolContext } from "./define.js";
+export { runTool, type Tool, type ToolContext } from "./define.js";

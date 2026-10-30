@@ -223,6 +223,37 @@ describe("orders", () => {
   });
 });
 
+describe("assistant chat", () => {
+  it("forwards the message with the user's token and returns the actions it prepared", async () => {
+    const token = tokenFor("customer");
+    const { data, errors } = await gql(
+      `mutation { chat(message: "compra la booster box", conversationId: "conv_1") {
+        conversationId reply actions { actionId kind summary }
+      } }`,
+      { token },
+    );
+
+    expect(errors).toBeUndefined();
+    expect(data.chat).toEqual({
+      conversationId: "conv_1",
+      reply: "Recibido: compra la booster box",
+      actions: [{ actionId: "act_checkout", kind: "CHECKOUT", summary: "Buy 1 product(s) for $149.99" }],
+    });
+    expect(mcp.requests).toEqual([
+      { path: "/chat", authorization: `Bearer ${token}`, body: { message: "compra la booster box", conversationId: "conv_1" } },
+    ]);
+  });
+
+  it("starts a conversation without an id", async () => {
+    const { data } = await gql(`mutation { chat(message: "hola") { conversationId actions { actionId } } }`, {
+      token: tokenFor("customer"),
+    });
+
+    expect(data.chat).toEqual({ conversationId: "conv_new", actions: [] });
+    expect(mcp.requests[0]!.body).toEqual({ message: "hola" });
+  });
+});
+
 describe("assistant actions", () => {
   it("confirms a purchase with the user's token and returns the order", async () => {
     const token = tokenFor("customer");
