@@ -102,6 +102,8 @@ services:
       dockerfile: mcp-server/Dockerfile
     environment:
       JWT_SECRET: ${JWT_SECRET}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-opus-5-5}
       CATALOG_GRPC_TARGET: catalog-service:50051
       ORDERS_GRPC_TARGET: orders-service:50052
       INVENTORY_GRPC_TARGET: inventory-service:50053

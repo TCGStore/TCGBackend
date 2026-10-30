@@ -1,6 +1,8 @@
-# JWT_SECRET must match users-service; it's read from ../.env when that file exists.
+# Read from ../.env when that file exists. JWT_SECRET must match users-service.
 JWT_SECRET ?= $(shell grep -s '^JWT_SECRET=' ../.env | cut -d= -f2-)
-export JWT_SECRET
+ANTHROPIC_API_KEY ?= $(shell grep -s '^ANTHROPIC_API_KEY=' ../.env | cut -d= -f2-)
+ANTHROPIC_MODEL ?= $(shell grep -s '^ANTHROPIC_MODEL=' ../.env | cut -d= -f2-)
+export JWT_SECRET ANTHROPIC_API_KEY ANTHROPIC_MODEL
 
 .PHONY: install run test
 

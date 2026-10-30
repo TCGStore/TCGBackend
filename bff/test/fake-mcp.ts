@@ -8,10 +8,29 @@ const ACTIONS: Record<string, { status: number; body: object }> = {
   act_changed: { status: 409, body: { error: "the cart changed after the purchase was prepared: prepare it again" } },
 };
 
-/** The mcp-server's /actions endpoints; every request is recorded in `requests`. */
+// The agent prepares a purchase when asked to buy, and otherwise just answers.
+function chatReply({ message, conversationId }: { message: string; conversationId?: string }) {
+  const actions = message.includes("compra")
+    ? [{ actionId: "act_checkout", kind: "checkout", summary: "Buy 1 product(s) for $149.99", details: {}, expiresAt: "2026-10-30T12:10:00.000Z" }]
+    : [];
+  return { conversationId: conversationId ?? "conv_new", reply: `Recibido: ${message}`, actions };
+}
+
+/** The mcp-server's /chat and /actions endpoints; every request is recorded in `requests`. */
 export async function startFakeMcp() {
-  const requests: { path: string; authorization?: string }[] = [];
-  const server = createServer((req, res) => {
+  const requests: { path: string; authorization?: string; body?: any }[] = [];
+  const server = createServer(async (req, res) => {
+    if (req.url === "/chat") {
+      let raw = "";
+      for await (const chunk of req) {
+        raw += chunk;
+      }
+      const body = JSON.parse(raw);
+      requests.push({ path: req.url, authorization: req.headers.authorization, body });
+      res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify(chatReply(body)));
+      return;
+    }
+
     requests.push({ path: req.url!, authorization: req.headers.authorization });
     const [, , actionId, verb] = req.url!.split("/");
     const action = ACTIONS[actionId!];

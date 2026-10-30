@@ -3,6 +3,9 @@ export interface Config {
   jwtSecret: string;
   protoDir: string;
   grpcDeadlineMs: number;
+  /** Without it /chat answers 503; the MCP tools still work. */
+  anthropicApiKey: string | undefined;
+  anthropicModel: string;
   targets: {
     catalog: string;
     orders: string;
@@ -18,6 +21,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     jwtSecret: required(env, "JWT_SECRET", "the same value users-service uses"),
     protoDir: env.PROTO_DIR ?? "../proto",
     grpcDeadlineMs: Number(env.GRPC_DEADLINE_MS ?? 5000),
+    anthropicApiKey: env.ANTHROPIC_API_KEY || undefined,
+    anthropicModel: env.ANTHROPIC_MODEL || "claude-opus-5-5",
     targets: {
       catalog: env.CATALOG_GRPC_TARGET ?? "localhost:50051",
       orders: env.ORDERS_GRPC_TARGET ?? "localhost:50052",

@@ -55,7 +55,12 @@ type Mutation {
   "Requires an admin. Sets the units available for sale."
   setStock(productId: ID!, available: Int!): Stock!
 
-  "Requires login. Placeholder until the AI agent (mcp-server) is ready."
+  """
+  Requires login. Sends a message (1 to 2000 characters) to the AI assistant, which can
+  take up to 90 seconds. Without conversationId it starts a new conversation; an expired
+  one (1 hour without messages) also starts over, with a new id. FAILED_PRECONDITION if
+  the previous message of the conversation is still being answered.
+  """
   chat(message: String!, conversationId: ID): ChatReply!
   """
   Requires login. Runs a purchase or stock change that the assistant prepared; call it
@@ -324,4 +329,15 @@ type ChatReply {
   "Send it back in the next message to continue the same conversation."
   conversationId: ID!
   reply: String!
+  "Purchases or stock changes prepared in this reply: show a \"Confirm\" button for each."
+  actions: [PendingAction!]!
+}
+
+type PendingAction {
+  "Pass it to confirmAction or cancelAction."
+  actionId: ID!
+  kind: ActionKind!
+  "e.g. \"Buy 2 product(s) for $17.98\"."
+  summary: String!
+  expiresAt: String!
 }

@@ -7,6 +7,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 
 import { PendingActions } from "../src/actions.js";
 import { createApp } from "../src/app.js";
+import { Conversations } from "../src/conversations.js";
 import { createGrpcClients, type GrpcClients } from "../src/grpc.js";
 import { PROTO_DIR, startFakeServices } from "./fake-services.js";
 
@@ -55,11 +56,19 @@ beforeAll(async () => {
     jwtSecret: SECRET,
     protoDir: PROTO_DIR,
     grpcDeadlineMs: 2000,
+    anthropicApiKey: undefined,
+    anthropicModel: "claude-opus-5-5",
     targets: Object.fromEntries(
       ["catalog", "orders", "inventory", "users", "notifications"].map((name) => [name, services.target]),
     ) as any,
   });
-  const app = createApp({ jwtSecret: SECRET, grpc, actions: new PendingActions() });
+  const app = createApp({
+    jwtSecret: SECRET,
+    grpc,
+    actions: new PendingActions(),
+    agent: null,
+    conversations: new Conversations(),
+  });
   server = app.listen(0);
   baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 });

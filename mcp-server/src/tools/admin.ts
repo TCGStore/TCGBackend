@@ -46,6 +46,7 @@ export const setStock = defineTool({
     "anything: it returns a pending action that the admin must confirm with a button in the store.",
   adminOnly: true,
   readOnly: false,
+  needsConfirmation: true,
   inputSchema: z.object({
     product_id: z.string().min(1),
     available: z.number().int().min(0),
