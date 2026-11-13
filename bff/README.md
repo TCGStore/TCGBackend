@@ -30,7 +30,24 @@ autocompletado y documentación de cada campo).
 
 Los `user_id` que llegan a los servicios salen siempre del token, nunca de los
 argumentos de la consulta: un cliente no puede pedir el carrito o los pedidos de otro.
-`setStock` solo funciona con `role: admin`.
+`setStock`, `setProductPrice` y `removeProductPrice` solo funcionan con `role: admin`.
+
+### Productos sin precio
+
+`products` y `product` funcionan sin login, pero si llega un token tiene que ser válido
+(si expiró, `UNAUTHENTICATED`: el frontend debe borrarlo). Según quién pregunte:
+
+- **Visitantes y clientes** solo ven productos con precio. Lo que no tiene precio no
+  aparece en la lista y `product(id)` devuelve `null`.
+- **Admins (el staff)** ven todo; los productos sin precio llegan con `priceCents: null`.
+  Con `filter: { unpricedOnly: true }` ven solo los que esperan precio, y se lo ponen con
+  `setProductPrice`. Solo se puede con producto sellado: el precio de las cartas viene
+  del import de pokemontcg.io (ver TCGCatalogService).
+
+```graphql
+query { products(filter: { unpricedOnly: true }) { items { id name type } } }
+mutation { setProductPrice(productId: "prd_obf_box_en", priceCents: 14999) { id priceCents } }
+```
 
 Errores: cada error trae `extensions.code` (`UNAUTHENTICATED`, `FORBIDDEN`,
 `BAD_USER_INPUT`, `NOT_FOUND`, `ALREADY_EXISTS`, `FAILED_PRECONDITION`,

@@ -17,7 +17,7 @@ export function toProduct(product: pb.Product) {
     id: product.id,
     name: product.name,
     type: enumFromProto("PRODUCT_TYPE", product.type),
-    priceCents: product.priceCents,
+    priceCents: product.priceCents ?? null,
     imageUrl: product.imageUrl || null,
     description: product.description || null,
     card: card && {

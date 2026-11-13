@@ -42,7 +42,19 @@ const PRODUCTS = [
     description: "9 booster packs",
     sealed: { setCode: "OBF", setName: "Obsidian Flames", language: "en" },
   },
+  {
+    id: "prd_box",
+    name: "Obsidian Flames Booster Box",
+    type: "PRODUCT_TYPE_BOOSTER_BOX",
+    imageUrl: "",
+    description: "",
+    sealed: { setCode: "OBF", setName: "Obsidian Flames", language: "en" },
+  },
 ];
+
+// Like catalog-service: products without a price only show up with includeUnpriced.
+const visible = (includeUnpriced: boolean) =>
+  PRODUCTS.filter((product) => includeUnpriced || product.priceCents !== undefined);
 
 const CART = {
   userId: "usr_ash",
@@ -98,9 +110,22 @@ export async function startFakeServices() {
   };
 
   add(proto.tcgstore.catalog.CatalogService, {
-    GetProduct: ({ id }) => PRODUCTS.find((product) => product.id === id) ?? fail(grpc.status.NOT_FOUND, "product not found"),
-    GetProducts: ({ ids }) => ({ products: PRODUCTS.filter((product) => ids.includes(product.id)) }),
-    SearchProducts: () => ({ products: PRODUCTS, totalCount: PRODUCTS.length }),
+    GetProduct: ({ id, includeUnpriced }) =>
+      visible(includeUnpriced).find((product) => product.id === id) ?? fail(grpc.status.NOT_FOUND, "product not found"),
+    GetProducts: ({ ids, includeUnpriced }) => ({
+      products: visible(includeUnpriced).filter((product) => ids.includes(product.id)),
+    }),
+    SearchProducts: ({ includeUnpriced }) => {
+      const products = visible(includeUnpriced);
+      return { products, totalCount: products.length };
+    },
+    SetProductPrice: ({ id, priceCents }) => {
+      const product = PRODUCTS.find((p) => p.id === id) ?? fail(grpc.status.NOT_FOUND, "product not found");
+      if (product.card) {
+        fail(grpc.status.FAILED_PRECONDITION, "card prices come from the pokemontcg.io import");
+      }
+      return { ...product, priceCents };
+    },
   });
   add(proto.tcgstore.inventory.InventoryService, {
     GetStocks: ({ productIds }) => ({

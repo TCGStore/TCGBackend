@@ -1,7 +1,9 @@
 import { UseGuards } from "@nestjs/common";
 import { Args, Context, Mutation, Parent, Query, ResolveField, Resolver } from "@nestjs/graphql";
 
-import { AdminGuard } from "../auth/auth.guard";
+import { GraphQLError } from "graphql";
+
+import { AdminGuard, type AuthUser, CurrentUser, OptionalAuthGuard } from "../auth/auth.guard";
 import type { GraphQLContext } from "../graphql/context";
 import { enumToProto, toProduct } from "../graphql/mappers";
 import { GrpcClients } from "../grpc/clients";
@@ -19,20 +21,30 @@ interface ProductFilter {
   minPriceCents?: number;
   maxPriceCents?: number;
   gradedOnly?: boolean;
+  unpricedOnly?: boolean;
 }
+
+// Only the staff sees products without a price, so it can price them.
+const seesUnpriced = (user: AuthUser | undefined) => user?.role === "admin";
 
 @Resolver()
 export class CatalogResolver {
   constructor(private readonly grpc: GrpcClients) {}
 
   @Query()
+  @UseGuards(OptionalAuthGuard)
   async products(
     @Args("filter") filter: ProductFilter | null,
     @Args("page") page: number,
     @Args("pageSize") pageSize: number,
+    @CurrentUser() user: AuthUser | undefined,
   ) {
+    if (filter?.unpricedOnly && !seesUnpriced(user)) {
+      throw new GraphQLError("unpricedOnly is for admins only", { extensions: { code: "FORBIDDEN" } });
+    }
     const { products, totalCount } = await this.grpc.catalog.searchProducts({
       ...filter,
+      includeUnpriced: seesUnpriced(user),
       type: enumToProto("PRODUCT_TYPE", filter?.type),
       supertype: enumToProto("CARD_SUPERTYPE", filter?.supertype),
       condition: enumToProto("CARD_CONDITION", filter?.condition),
@@ -43,15 +55,28 @@ export class CatalogResolver {
   }
 
   @Query()
-  async product(@Args("id") id: string) {
+  @UseGuards(OptionalAuthGuard)
+  async product(@Args("id") id: string, @CurrentUser() user: AuthUser | undefined) {
     try {
-      return toProduct(await this.grpc.catalog.getProduct({ id }));
+      return toProduct(await this.grpc.catalog.getProduct({ id, includeUnpriced: seesUnpriced(user) }));
     } catch (error) {
       if (isNotFound(error)) {
         return null;
       }
       throw error;
     }
+  }
+
+  @Mutation()
+  @UseGuards(AdminGuard)
+  async setProductPrice(@Args("productId") productId: string, @Args("priceCents") priceCents: number) {
+    return toProduct(await this.grpc.catalog.setProductPrice({ id: productId, priceCents }));
+  }
+
+  @Mutation()
+  @UseGuards(AdminGuard)
+  async removeProductPrice(@Args("productId") productId: string) {
+    return toProduct(await this.grpc.catalog.setProductPrice({ id: productId }));
   }
 
   @Mutation()

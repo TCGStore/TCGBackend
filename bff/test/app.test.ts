@@ -105,6 +105,67 @@ describe("catalog", () => {
     expect(callsTo("InventoryService.GetStocks")[0]!.request.productIds).toEqual(["prd_pikachu", "prd_etb"]);
   });
 
+  it("hides products without a price from customers and anonymous visitors", async () => {
+    const anonymous = await gql(`{ products { totalCount items { id } } product(id: "prd_box") { id } }`);
+    const customer = await gql(`{ products { totalCount } }`, { token: tokenFor("customer") });
+
+    expect(anonymous.errors).toBeUndefined();
+    expect(anonymous.data.products.items.map((item: any) => item.id)).toEqual(["prd_pikachu", "prd_etb"]);
+    expect(anonymous.data.product).toBeNull();
+    expect(customer.data.products.totalCount).toBe(2);
+    expect(callsTo("CatalogService.SearchProducts").map((call) => call.request.includeUnpriced)).toEqual([false, false]);
+  });
+
+  it("shows products without a price to admins, with a null price", async () => {
+    const { data, errors } = await gql(`{ products(filter: { unpricedOnly: true }) { items { id } } product(id: "prd_box") { priceCents } }`, {
+      token: tokenFor("admin"),
+    });
+
+    expect(errors).toBeUndefined();
+    expect(data.product).toEqual({ priceCents: null });
+    expect(callsTo("CatalogService.SearchProducts")[0]!.request).toMatchObject({ includeUnpriced: true, unpricedOnly: true });
+  });
+
+  it("only lets admins filter by unpricedOnly", async () => {
+    const { errors } = await gql(`{ products(filter: { unpricedOnly: true }) { totalCount } }`, { token: tokenFor("customer") });
+
+    expect(errors?.[0]?.extensions.code).toBe("FORBIDDEN");
+    expect(callsTo("CatalogService.SearchProducts")).toHaveLength(0);
+  });
+
+  it("rejects an invalid token even on public queries", async () => {
+    const forged = tokenFor("admin", "usr_ash", "another-secret-with-at-least-32-chars");
+    const { errors } = await gql(`{ products { totalCount } }`, { token: forged });
+
+    expect(errors?.[0]?.extensions.code).toBe("UNAUTHENTICATED");
+  });
+
+  it("lets only admins price sealed products", async () => {
+    const mutation = `mutation { setProductPrice(productId: "prd_box", priceCents: 14999) { id priceCents } }`;
+
+    const asCustomer = await gql(mutation, { token: tokenFor("customer") });
+    expect(asCustomer.errors?.[0]?.extensions.code).toBe("FORBIDDEN");
+    expect(callsTo("CatalogService.SetProductPrice")).toHaveLength(0);
+
+    const asAdmin = await gql(mutation, { token: tokenFor("admin") });
+    expect(asAdmin.data.setProductPrice).toEqual({ id: "prd_box", priceCents: 14999 });
+  });
+
+  it("removes a price by sending no priceCents to catalog-service", async () => {
+    const { data } = await gql(`mutation { removeProductPrice(productId: "prd_etb") { priceCents } }`, { token: tokenFor("admin") });
+
+    expect(data.removeProductPrice).toEqual({ priceCents: null });
+    expect(callsTo("CatalogService.SetProductPrice")[0]!.request).toEqual({ id: "prd_etb" });
+  });
+
+  it("refuses to price a card", async () => {
+    const { errors } = await gql(`mutation { setProductPrice(productId: "prd_pikachu", priceCents: 100) { id } }`, {
+      token: tokenFor("admin"),
+    });
+
+    expect(errors?.[0]?.extensions.code).toBe("FAILED_PRECONDITION");
+  });
+
   it("returns null for a product that doesn't exist", async () => {
     const { data, errors } = await gql(`{ product(id: "prd_missing") { id } }`);
 
