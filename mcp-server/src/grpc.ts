@@ -12,7 +12,8 @@ export interface Product {
   id: string;
   name: string;
   type: string;
-  priceCents: number;
+  /** Missing when the product has no price yet; only admins get those. */
+  priceCents?: number;
   description: string;
   card?: {
     setCode: string;
@@ -39,6 +40,7 @@ export interface SearchProductsRequest {
   minPriceCents?: number;
   maxPriceCents?: number;
   gradedOnly?: boolean;
+  includeUnpriced?: boolean;
   page?: number;
   pageSize?: number;
 }
@@ -100,7 +102,7 @@ interface Reader {
 
 export interface GrpcClients {
   catalog: {
-    getProducts(request: { ids: string[] }): Promise<{ products: Product[] }>;
+    getProducts(request: { ids: string[]; includeUnpriced?: boolean }): Promise<{ products: Product[] }>;
     searchProducts(request: SearchProductsRequest): Promise<{ products: Product[]; totalCount: number }>;
   };
   inventory: {

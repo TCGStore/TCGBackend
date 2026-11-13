@@ -30,7 +30,17 @@ const PRODUCTS = [
     priceCents: 14999,
     sealed: { setCode: "OBF", setName: "Obsidian Flames", language: "en" },
   },
+  {
+    id: "prd_etb",
+    name: "151 Elite Trainer Box",
+    type: "PRODUCT_TYPE_ELITE_TRAINER_BOX",
+    sealed: { setCode: "MEW", setName: "151", language: "en" },
+  },
 ];
+
+// Like catalog-service: products without a price only show up with includeUnpriced.
+const visible = (includeUnpriced: boolean) =>
+  PRODUCTS.filter((product) => includeUnpriced || product.priceCents !== undefined);
 
 const ADDRESS = {
   recipientName: "Misty",
@@ -63,7 +73,8 @@ export async function startFakeServices() {
   const cart = (userId: string) => {
     const items = (carts.get(userId) ?? []).map((item) => {
       const product = PRODUCTS.find((p) => p.id === item.productId)!;
-      return { ...item, name: product.name, unitPriceCents: product.priceCents, subtotalCents: product.priceCents * item.quantity };
+      const price = product.priceCents ?? 0; // orders-service never lets an unpriced product into the cart
+      return { ...item, name: product.name, unitPriceCents: price, subtotalCents: price * item.quantity };
     });
     return { userId, items, totalCents: items.reduce((sum, item) => sum + item.subtotalCents, 0) };
   };
@@ -84,8 +95,13 @@ export async function startFakeServices() {
   };
 
   add(proto.tcgstore.catalog.CatalogService, {
-    GetProducts: ({ ids }) => ({ products: PRODUCTS.filter((product) => ids.includes(product.id)) }),
-    SearchProducts: () => ({ products: PRODUCTS, totalCount: PRODUCTS.length }),
+    GetProducts: ({ ids, includeUnpriced }) => ({
+      products: visible(includeUnpriced).filter((product) => ids.includes(product.id)),
+    }),
+    SearchProducts: ({ includeUnpriced }) => {
+      const products = visible(includeUnpriced);
+      return { products, totalCount: products.length };
+    },
   });
   add(proto.tcgstore.inventory.InventoryService, {
     GetStocks: ({ productIds }) => ({
