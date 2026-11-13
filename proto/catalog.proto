@@ -6,11 +6,16 @@ option go_package = "github.com/TCGStore/TCGCatalogService/gen/catalogpb;catalog
 option java_multiple_files = true;
 option java_package = "com.tcgstore.catalog.grpc";
 
+// Products without a price are hidden (NOT_FOUND or left out) unless the request
+// sets include_unpriced, which only the BFF does, and only for admins.
 service CatalogService {
   rpc GetProduct(GetProductRequest) returns (Product);
   // Missing ids are skipped, so the response can be shorter than the request.
   rpc GetProducts(GetProductsRequest) returns (GetProductsResponse);
   rpc SearchProducts(SearchProductsRequest) returns (SearchProductsResponse);
+  // Sealed products only: FAILED_PRECONDITION for cards, whose price comes from the
+  // pokemontcg.io import.
+  rpc SetProductPrice(SetProductPriceRequest) returns (Product);
 }
 
 enum ProductType {
@@ -43,7 +48,9 @@ message Product {
   string id = 1;
   string name = 2;
   ProductType type = 3;
-  int64 price_cents = 4;
+  // Unset for sealed products the staff hasn't priced yet and for cards with no
+  // market price in the import.
+  optional int64 price_cents = 4;
   string image_url = 5;
   string description = 6;
 
@@ -78,10 +85,12 @@ message SealedDetails {
 
 message GetProductRequest {
   string id = 1;
+  bool include_unpriced = 2;
 }
 
 message GetProductsRequest {
   repeated string ids = 1;
+  bool include_unpriced = 2;
 }
 
 message GetProductsResponse {
@@ -100,6 +109,8 @@ message SearchProductsRequest {
   optional int64 min_price_cents = 8;
   optional int64 max_price_cents = 9;
   bool graded_only = 10;
+  bool include_unpriced = 11;
+  bool unpriced_only = 12;  // Products waiting for a price; implies include_unpriced.
 
   int32 page = 20;       // 1-based. Defaults to 1.
   int32 page_size = 21;  // Defaults to 20, max 100.
@@ -108,4 +119,10 @@ message SearchProductsRequest {
 message SearchProductsResponse {
   repeated Product products = 1;
   int32 total_count = 2;
+}
+
+message SetProductPriceRequest {
+  string id = 1;
+  // Must be positive. Unset removes the price, which hides the product from customers.
+  optional int64 price_cents = 2;
 }
