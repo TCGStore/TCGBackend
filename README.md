@@ -65,7 +65,15 @@ pokemon-tcg-store/
 # desde TCGBackend/
 cp .env.example .env      # completa los valores
 docker compose up -d      # levanta los servicios, el BFF, el MCP y la infraestructura
+
+# datos: producto sellado (sin precio), cartas desde pokemontcg.io y stock inicial
+docker compose run --rm --entrypoint /app/seed catalog-service
+docker compose run --rm --entrypoint /app/import catalog-service
+docker compose run --rm inventory-service python -m inventory.seed
 ```
+
+El producto sellado nace sin precio y los clientes no lo ven hasta que un admin le pone
+uno (`setProductPrice` en el BFF). Detalle en `TCGCatalogService/README.md`.
 
 ## Flujo de trabajo
 

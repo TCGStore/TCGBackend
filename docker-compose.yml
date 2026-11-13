@@ -2,7 +2,8 @@
 # así que todos deben estar clonados en la misma carpeta (ver README.md).
 #
 # Uso: cp .env.example .env && docker compose up -d
-# Datos de prueba del catálogo: docker compose run --rm --entrypoint /app/seed catalog-service
+# Producto sellado (sin precio): docker compose run --rm --entrypoint /app/seed catalog-service
+# Cartas desde pokemontcg.io:     docker compose run --rm --entrypoint /app/import catalog-service
 # Stock inicial:                 docker compose run --rm inventory-service python -m inventory.seed
 
 services:
@@ -11,6 +12,7 @@ services:
     environment:
       MONGO_URI: mongodb://${MONGO_USER}:${MONGO_PASSWORD}@mongodb:27017
       MONGO_DB: catalog
+      POKEMONTCG_API_KEY: ${POKEMONTCG_API_KEY:-} # solo la usa /app/import
     ports: ["50051:50051"]
     depends_on: [mongodb]
 
