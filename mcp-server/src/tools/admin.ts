@@ -29,7 +29,7 @@ export const listLowStock = defineTool({
 
     // An old alert may already be solved, so the current stock decides.
     const [{ products }, { stocks }] = await Promise.all([
-      grpc.catalog.getProducts({ ids: productIds }),
+      grpc.catalog.getProducts({ ids: productIds, includeUnpriced: true }),
       grpc.inventory.getStocks({ productIds }),
     ]);
     const low = new Map(stocks.filter((stock) => stock.lowStock).map((stock) => [stock.productId, stock]));
@@ -53,7 +53,7 @@ export const setStock = defineTool({
   }),
   async run({ product_id, available }, { grpc, identity, actions }) {
     const [{ products }, { stocks }] = await Promise.all([
-      grpc.catalog.getProducts({ ids: [product_id] }),
+      grpc.catalog.getProducts({ ids: [product_id], includeUnpriced: true }),
       grpc.inventory.getStocks({ productIds: [product_id] }),
     ]);
     const product = products[0];

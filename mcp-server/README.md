@@ -26,6 +26,10 @@ con Claude y ejecuta las tools que Claude le pide.
 | `list_low_stock` | notifications (alertas) + inventory | solo admin, lectura |
 | `set_stock` | inventory · `SetStock` | solo admin, **requiere confirmación** |
 
+`search_products` y `get_products` solo devuelven productos con precio, salvo para admins,
+que también ven los que no tienen (`price_usd: null`). El agente no puede poner precios:
+eso se hace con `setProductPrice` en el BFF.
+
 Diferencias con los servicios, pensadas para la IA:
 
 - **Precios en dólares** (`price_usd: 8.99`, `max_price_usd: 30`), porque así habla el

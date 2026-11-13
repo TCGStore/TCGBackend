@@ -141,6 +141,15 @@ describe("catalog tools", () => {
     });
   });
 
+  it("shows products without a price only to admins", async () => {
+    const customer = await call(await connect(tokenFor("customer")), "search_products", { type: "ELITE_TRAINER_BOX" });
+    const admin = await call(await connect(tokenFor("admin")), "get_products", { product_ids: ["prd_etb"] });
+
+    expect(customer.json().products.map((product: any) => product.id)).not.toContain("prd_etb");
+    expect(callsTo("CatalogService.SearchProducts")[0]!.request.includeUnpriced).toBe(false);
+    expect(admin.json().products[0]).toMatchObject({ id: "prd_etb", price_usd: null });
+  });
+
   it("rejects invalid input before calling any service", async () => {
     const client = await connect(tokenFor("customer"));
     const result = await call(client, "search_products", { type: "TOY" });

@@ -7,7 +7,8 @@ export interface Product {
   id: string;
   name: string;
   type: string;
-  priceCents: number;
+  /** Missing when the product has no price yet. */
+  priceCents?: number;
   imageUrl: string;
   description: string;
   card?: CardDetails;
@@ -43,14 +44,18 @@ export interface SearchProductsRequest {
   minPriceCents?: number;
   maxPriceCents?: number;
   gradedOnly?: boolean;
+  includeUnpriced?: boolean;
+  unpricedOnly?: boolean;
   page?: number;
   pageSize?: number;
 }
 
 export interface CatalogService {
-  getProduct(request: { id: string }): Promise<Product>;
-  getProducts(request: { ids: string[] }): Promise<{ products: Product[] }>;
+  getProduct(request: { id: string; includeUnpriced?: boolean }): Promise<Product>;
+  getProducts(request: { ids: string[]; includeUnpriced?: boolean }): Promise<{ products: Product[] }>;
   searchProducts(request: SearchProductsRequest): Promise<{ products: Product[]; totalCount: number }>;
+  /** Without priceCents, removes the price. */
+  setProductPrice(request: { id: string; priceCents?: number }): Promise<Product>;
 }
 
 // inventory.proto

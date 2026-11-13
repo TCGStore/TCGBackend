@@ -63,7 +63,16 @@ export class AdminGuard extends AuthGuard {
   }
 }
 
-/** The user set by AuthGuard or AdminGuard; only use it next to one of them. */
+/** For public queries: without a token the visitor is anonymous, but a token sent must be valid. */
+@Injectable()
+export class OptionalAuthGuard extends AuthGuard {
+  override canActivate(context: ExecutionContext): boolean {
+    const { req } = GqlExecutionContext.create(context).getContext<GraphQLContext>();
+    return req.headers.authorization ? super.canActivate(context) : true;
+  }
+}
+
+/** The user set by one of the guards above; undefined for anonymous visitors with OptionalAuthGuard. */
 export const CurrentUser = createParamDecorator(
   (_data: unknown, context: ExecutionContext) =>
     GqlExecutionContext.create(context).getContext<GraphQLContext>().user,

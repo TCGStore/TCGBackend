@@ -20,7 +20,8 @@ export const searchProducts = defineTool({
   description:
     "Search the store catalog: single Pokémon TCG cards and sealed products (booster packs, booster boxes, " +
     "Elite Trainer Boxes). Every filter is optional. Each result includes `available`, the units in stock " +
-    "right now. A card in another condition, language or grade is a different product with its own id.",
+    "right now. A card in another condition, language or grade is a different product with its own id. " +
+    "For admins it also returns products without a price (price_usd null), which customers can't see or buy.",
   readOnly: true,
   inputSchema: z.object({
     query: z.string().optional().describe("Words from the product name, in English, e.g. \"Charizard\" or \"Obsidian Flames\""),
@@ -39,8 +40,9 @@ export const searchProducts = defineTool({
     page: z.number().int().min(1).default(1),
     page_size: z.number().int().min(1).max(50).default(20),
   }),
-  async run(input, { grpc }) {
+  async run(input, { grpc, identity }) {
     const { products, totalCount } = await grpc.catalog.searchProducts({
+      includeUnpriced: identity.role === "admin",
       query: input.query,
       type: toProto("PRODUCT_TYPE", input.type),
       supertype: toProto("CARD_SUPERTYPE", input.supertype),
@@ -63,8 +65,8 @@ export const getProducts = defineTool({
   description: "Get full details and current stock of products by id. Ids that don't exist are left out.",
   readOnly: true,
   inputSchema: z.object({ product_ids: productIds }),
-  async run({ product_ids }, { grpc }) {
-    const { products } = await grpc.catalog.getProducts({ ids: product_ids });
+  async run({ product_ids }, { grpc, identity }) {
+    const { products } = await grpc.catalog.getProducts({ ids: product_ids, includeUnpriced: identity.role === "admin" });
     return { products: await withStock(grpc, products) };
   },
 });

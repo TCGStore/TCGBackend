@@ -8,9 +8,12 @@ UNAUTHENTICATED, FORBIDDEN, BAD_USER_INPUT, NOT_FOUND, ALREADY_EXISTS,
 FAILED_PRECONDITION, SERVICE_UNAVAILABLE or INTERNAL_SERVER_ERROR.
 """
 type Query {
-  "Unset filters are ignored. pageSize max 100."
+  """
+  Login optional. Unset filters are ignored. pageSize max 100.
+  Products without a price are only listed for admins.
+  """
   products(filter: ProductFilter, page: Int = 1, pageSize: Int = 20): ProductPage!
-  "Null if the product doesn't exist."
+  "Login optional. Null if the product doesn't exist, or has no price and the caller isn't an admin."
   product(id: ID!): Product
 
   "Requires login."
@@ -54,6 +57,14 @@ type Mutation {
 
   "Requires an admin. Sets the units available for sale."
   setStock(productId: ID!, available: Int!): Stock!
+  """
+  Requires an admin. Prices a sealed product (pack or box), which makes it visible to
+  customers. priceCents must be positive. FAILED_PRECONDITION for cards: their price
+  comes from the pokemontcg.io import.
+  """
+  setProductPrice(productId: ID!, priceCents: Int!): Product!
+  "Requires an admin. Removes the price of a sealed product, hiding it from customers."
+  removeProductPrice(productId: ID!): Product!
 
   """
   Requires login. Sends a message (1 to 2000 characters) to the AI assistant, which can
@@ -104,7 +115,11 @@ type Product {
   id: ID!
   name: String!
   type: ProductType!
-  priceCents: Int!
+  """
+  Null only for admins: sealed products the staff hasn't priced yet, or cards with
+  no market price in the last import.
+  """
+  priceCents: Int
   imageUrl: String
   description: String
   "Set only when type is CARD."
@@ -165,6 +180,8 @@ input ProductFilter {
   minPriceCents: Int
   maxPriceCents: Int
   gradedOnly: Boolean
+  "Admins only (FORBIDDEN otherwise): just the products waiting for a price. Ignores the price range."
+  unpricedOnly: Boolean
 }
 
 type ProductPage {

@@ -21,7 +21,7 @@ export function productView(product: Product, stock: StockLevel | undefined) {
     id: product.id,
     name: product.name,
     type: fromProto("PRODUCT_TYPE", product.type),
-    price_usd: usd(product.priceCents),
+    price_usd: product.priceCents === undefined ? null : usd(product.priceCents),
     available: stock?.available ?? null,
     ...(card && {
       card: {
