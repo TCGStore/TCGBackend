@@ -40,6 +40,16 @@ export const updateCartItem = defineTool({
   },
 });
 
+export const clearCart = defineTool({
+  name: "clear_cart",
+  description: "Remove everything from the user's cart. Returns the empty cart.",
+  readOnly: false,
+  inputSchema: z.object({}),
+  async run(_input, { grpc, identity }) {
+    return cartView(await grpc.orders.clearCart({ userId: identity.userId }));
+  },
+});
+
 const address = z.object({
   recipient_name: z.string().min(1),
   street: z.string().min(1),

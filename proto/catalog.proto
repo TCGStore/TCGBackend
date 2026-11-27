@@ -13,9 +13,17 @@ service CatalogService {
   // Missing ids are skipped, so the response can be shorter than the request.
   rpc GetProducts(GetProductsRequest) returns (GetProductsResponse);
   rpc SearchProducts(SearchProductsRequest) returns (SearchProductsResponse);
-  // Sealed products only: FAILED_PRECONDITION for cards, whose price comes from the
-  // pokemontcg.io import.
+
+  // The writes below are for staff only: the BFF and the MCP server check the admin role.
+  // Imported cards are owned by the pokemontcg.io import, which would overwrite manual
+  // changes, so they answer FAILED_PRECONDITION. Sealed products and the card listings
+  // created with CreateProduct can be changed.
   rpc SetProductPrice(SetProductPriceRequest) returns (Product);
+  // The id is built from the product's data, so the same listing can't be created twice
+  // (ALREADY_EXISTS): prd_obf_box_en, prd_mew_006_en_lp, prd_mew_006_en_nm_psa10.
+  rpc CreateProduct(CreateProductRequest) returns (Product);
+  // Changes only the fields set in the request.
+  rpc UpdateProduct(UpdateProductRequest) returns (Product);
 }
 
 enum ProductType {
@@ -125,4 +133,37 @@ message SetProductPriceRequest {
   string id = 1;
   // Must be positive. Unset removes the price, which hides the product from customers.
   optional int64 price_cents = 2;
+  // Checks the request without writing and returns the product as it is now.
+  bool validate_only = 3;
+}
+
+message CreateProductRequest {
+  string name = 1;
+  ProductType type = 2;  // CARD needs card details; the other types need sealed details.
+  // Unset creates the product hidden from customers until it gets a price.
+  optional int64 price_cents = 3;
+  string image_url = 4;
+  string description = 5;
+  // Checks the request, duplicates included, and returns the product that would be
+  // created, with its id, without writing it.
+  bool validate_only = 6;
+
+  oneof details {
+    // Required: set_code, number, language and condition. Usually a copy of an imported
+    // card with another condition, language or grading.
+    CardDetails card = 10;
+    // Required: set_code and language.
+    SealedDetails sealed = 11;
+  }
+}
+
+// Set and language aren't editable because the id is built from them: create a new
+// listing instead.
+message UpdateProductRequest {
+  string id = 1;
+  optional string name = 2;
+  optional string image_url = 3;
+  optional string description = 4;  // Empty string removes it.
+  // Checks the request without writing and returns the product as it is now.
+  bool validate_only = 5;
 }

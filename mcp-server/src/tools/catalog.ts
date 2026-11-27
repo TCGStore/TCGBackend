@@ -37,12 +37,15 @@ export const searchProducts = defineTool({
     min_price_usd: z.number().min(0).optional(),
     max_price_usd: z.number().min(0).optional(),
     graded_only: z.boolean().optional().describe("Only graded cards (PSA, BGS, CGC)"),
+    unpriced_only: z.boolean().optional().describe("Admins only: products waiting for a price"),
     page: z.number().int().min(1).default(1),
     page_size: z.number().int().min(1).max(50).default(20),
   }),
   async run(input, { grpc, identity }) {
+    const admin = identity.role === "admin";
     const { products, totalCount } = await grpc.catalog.searchProducts({
-      includeUnpriced: identity.role === "admin",
+      includeUnpriced: admin,
+      unpricedOnly: admin && input.unpriced_only,
       query: input.query,
       type: toProto("PRODUCT_TYPE", input.type),
       supertype: toProto("CARD_SUPERTYPE", input.supertype),

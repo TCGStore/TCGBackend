@@ -19,16 +19,28 @@ con Claude y ejecuta las tools que Claude le pide.
 | `get_products` | catalog · `GetProducts` + inventory · `GetStocks` | lectura |
 | `check_stock` | inventory · `GetStocks` | lectura |
 | `get_cart` | orders · `GetCart` | lectura |
-| `add_to_cart`, `update_cart_item` | orders · `AddCartItem`, `UpdateCartItem` | escritura reversible |
+| `add_to_cart`, `update_cart_item`, `clear_cart` | orders · `AddCartItem`, `UpdateCartItem`, `ClearCart` | escritura reversible |
 | `checkout` | orders · `Checkout` | **requiere confirmación** |
 | `get_order`, `list_orders` | orders · `GetOrder`, `ListOrders` | lectura |
 | `list_notifications` | notifications · `ListNotifications` | lectura |
 | `list_low_stock` | notifications (alertas) + inventory | solo admin, lectura |
 | `set_stock` | inventory · `SetStock` | solo admin, **requiere confirmación** |
+| `set_product_price` | catalog · `SetProductPrice` | solo admin, **requiere confirmación** |
+| `update_product` | catalog · `UpdateProduct` (nombre, descripción, imagen) | solo admin, **requiere confirmación** |
+| `create_sealed_product` | catalog · `CreateProduct` + inventory · `SetStock` | solo admin, **requiere confirmación** |
+| `create_card_listing` | catalog · `CreateProduct` + inventory · `SetStock` | solo admin, **requiere confirmación** |
 
 `search_products` y `get_products` solo devuelven productos con precio, salvo para admins,
-que también ven los que no tienen (`price_usd: null`). El agente no puede poner precios:
-eso se hace con `setProductPrice` en el BFF.
+que también ven los que no tienen (`price_usd: null`) y pueden pedir solo esos con `unpriced_only`.
+
+Las tools de catálogo del admin no sirven para las **cartas importadas** (inglés, Near Mint,
+de pokemontcg.io): sus datos y precio los pone el import. Sí sirven para el producto sellado y
+para las publicaciones que crea el staff. `create_card_listing` crea otra versión de una carta
+del catálogo (otra condición, idioma o gradeada, ej. un Charizard PSA 10) copiando sus datos, y
+las dos tools de creación aceptan precio y stock inicial en la misma acción: un solo botón.
+
+Antes de mostrar el botón, las tools de catálogo llaman a la RPC con `validate_only`, así que un
+producto duplicado o una carta importada fallan al tiro y Claude se lo explica al admin.
 
 Diferencias con los servicios, pensadas para la IA:
 
@@ -60,14 +72,33 @@ Cliente: "cartas de tipo agua bajo 30 dólares"
 
 - **Mismas tools que el MCP.** Cada tool de `src/tools/` se pasa al Tool Runner con el
   mismo schema, y las tools de admin solo aparecen si el JWT es de admin.
-- **Compras con botón.** Si Claude llama a `checkout` o `set_stock`, la respuesta trae la
-  acción pendiente en `actions`, y el frontend muestra el botón "Confirmar".
+- **Un agente distinto por rol.** El rol sale del JWT y decide dos cosas: qué tools ve
+  Claude (`toolsFor`) y qué prompt de sistema recibe (`systemPromptFor` en `src/agent.ts`).
+  - **Cliente:** asistente de compras. Busca cartas, arma mazos, maneja el carrito (agregar,
+    cambiar cantidades, vaciar) y compra. El stock solo cambia con las compras o con una
+    corrección del staff, así que si pide cambiar stock, precios o datos, le dice que eso lo
+    hace el staff.
+  - **Admin:** asistente del staff. Revisa el stock bajo, corrige el stock (`set_stock` fija
+    el total, no suma), pone y quita precios, edita datos y crea productos. Si pide varios
+    cambios, los prepara todos en la misma respuesta (un botón por cambio). También puede
+    comprar como un cliente.
+- **Rápido y directo.** El prompt le pide actuar sin pedir permiso para lo que el usuario ya
+  pidió (el botón "Confirmar" ya protege compras y cambios), elegir la opción obvia cuando
+  una búsqueda trae varias, hacer llamadas en paralelo y responder en una a tres frases.
+  - El prompt solo cambia cómo se comporta Claude. La seguridad no depende de él: un
+    cliente no puede llamar a `set_stock` aunque convenza al modelo, porque la tool no existe
+    para su rol.
+- **Compras y cambios con botón.** Si Claude llama a `checkout` o a una tool de admin que
+  escribe, la respuesta trae la acción pendiente en `actions`, y el frontend muestra el botón
+  "Confirmar".
 - **Conversaciones en memoria.** Cada conversación guarda el historial completo (mensajes y
   llamadas a tools), que se reenvía a Claude en cada mensaje. Vence tras 1 hora sin uso, solo
   la puede continuar el usuario que la empezó y se pierde si el pod se reinicia.
 - **Límites.** Hasta 10 llamadas a Claude por mensaje y 90 segundos en total.
-- **Modelo.** `claude-opus-5-5` por defecto, con `effort: medium`. Se cambia con
-  `ANTHROPIC_MODEL` (ej. `claude-haiku-5-5`, mucho más barato para probar).
+- **Modelo.** `claude-opus-5-5` por defecto. Se cambia con `ANTHROPIC_MODEL` (ej.
+  `claude-haiku-5-5`, mucho más barato para probar).
+- **Effort.** `low` por defecto (`ANTHROPIC_EFFORT`): menos razonamiento, menos llamadas y
+  respuestas más cortas, o sea un chat más rápido. Si los mazos salen peor, probar `medium`.
 - **Costo.** El prompt de sistema, las tools y el historial se guardan en la caché de
   prompts de Claude, así que cada mensaje paga barato lo que ya se había enviado.
 - **Rechazos.** Si Claude rechaza una petición por políticas de seguridad, la API la
@@ -102,7 +133,7 @@ respondiendo el mensaje anterior, y `503` si falta `ANTHROPIC_API_KEY` o Claude 
    el modelo no puede pedir el carrito de otro.
 2. **Las tools de admin solo existen para admins.** El servidor MCP se arma en cada
    petición con las tools del rol del token: un cliente ni siquiera ve `set_stock`.
-3. **Confirmación en dos pasos.** `checkout` y `set_stock` **no ejecutan nada**: devuelven
+3. **Confirmación en dos pasos.** `checkout` y las tools de admin que escriben **no ejecutan nada**: devuelven
    una *acción pendiente* (`actionId`, resumen, detalle). Solo se ejecuta cuando llega
    `POST /actions/{actionId}/confirm` con el token del mismo usuario. Ese endpoint es REST,
    no es una tool, así que **el modelo no tiene forma de confirmar por sí mismo**: lo
@@ -141,7 +172,7 @@ src/
     define.ts      forma de una tool: nombre, descripción, schema (zod) y función
     catalog.ts     search_products, get_products, check_stock
     orders.ts      carrito, checkout, pedidos, notificaciones
-    admin.ts       list_low_stock, set_stock
+    admin.ts       stock, precios, edición y creación de productos (solo admin)
     format.ts      centavos → dólares, enums, vista de producto/carrito/pedido
 test/              vitest: un cliente MCP real contra un servidor gRPC falso, y el agente
                    contra una API de Claude falsa con respuestas escritas a mano
@@ -186,7 +217,7 @@ conversando, sin el agente ni la API key (útil para la presentación).
    curl -X POST http://localhost:4100/actions/<actionId>/confirm -H "Authorization: Bearer <token>"
    ```
 
-El token dura 24 horas; con un token de admin aparecen también `list_low_stock` y `set_stock`.
+El token dura 24 horas; con un token de admin aparecen también las tools de admin.
 
 ### Variables de entorno
 
@@ -195,6 +226,7 @@ El token dura 24 horas; con un token de admin aparecen también `list_low_stock`
 | `JWT_SECRET` | (obligatoria) | La misma de users-service y el BFF |
 | `ANTHROPIC_API_KEY` | (vacía) | Para el agente. Sin ella `/chat` responde `503` |
 | `ANTHROPIC_MODEL` | `claude-opus-5-5` | Modelo de Claude del agente |
+| `ANTHROPIC_EFFORT` | `low` | `low`, `medium`, `high`, `xhigh` o `max`: más alto razona más y tarda más |
 | `PORT` | `4100` | |
 | `PROTO_DIR` | `../proto` | |
 | `GRPC_DEADLINE_MS` | `5000` | Tiempo máximo de cada llamada gRPC |

@@ -73,7 +73,7 @@ docker compose run --rm inventory-service python -m inventory.seed
 ```
 
 El producto sellado nace sin precio y los clientes no lo ven hasta que un admin le pone
-uno (`setProductPrice` en el BFF). Detalle en `TCGCatalogService/README.md`.
+uno (`setProductPrice` en el BFF o pidiéndoselo al agente). Detalle en `TCGCatalogService/README.md`.
 
 ## Flujo de trabajo
 

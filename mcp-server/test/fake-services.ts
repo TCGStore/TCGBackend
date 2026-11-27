@@ -38,6 +38,18 @@ const PRODUCTS = [
   },
 ];
 
+// Like catalog-service: imported cards (prd_blastoise here) can't be edited by hand.
+function editable(id: string) {
+  const product = PRODUCTS.find((p) => p.id === id);
+  if (!product) {
+    fail(grpc.status.NOT_FOUND, `product "${id}" not found`);
+  }
+  if (product.card) {
+    fail(grpc.status.FAILED_PRECONDITION, `"${id}" is an imported card`);
+  }
+  return product;
+}
+
 // Like catalog-service: products without a price only show up with includeUnpriced.
 const visible = (includeUnpriced: boolean) =>
   PRODUCTS.filter((product) => includeUnpriced || product.priceCents !== undefined);
@@ -102,6 +114,19 @@ export async function startFakeServices() {
       const products = visible(includeUnpriced);
       return { products, totalCount: products.length };
     },
+    // The real checks live in catalog-service; these cover what the tools react to.
+    SetProductPrice: ({ id, priceCents, validateOnly }) => {
+      const product = editable(id);
+      return validateOnly ? product : { ...product, priceCents: priceCents ?? undefined };
+    },
+    UpdateProduct: ({ id, name, validateOnly }) => ({ ...editable(id), ...(!validateOnly && name && { name }) }),
+    CreateProduct: (request) => {
+      if (request.sealed?.setCode === "OBF" && request.type === "PRODUCT_TYPE_BOOSTER_BOX") {
+        fail(grpc.status.ALREADY_EXISTS, 'product "prd_obf_box_en" already exists');
+      }
+      const { validateOnly, details, ...product } = request;
+      return { ...product, id: "prd_new" };
+    },
   });
   add(proto.tcgstore.inventory.InventoryService, {
     GetStocks: ({ productIds }) => ({
@@ -111,6 +136,10 @@ export async function startFakeServices() {
   });
   add(proto.tcgstore.orders.OrdersService, {
     GetCart: ({ userId }) => cart(userId),
+    ClearCart: ({ userId }) => {
+      carts.delete(userId);
+      return cart(userId);
+    },
     AddCartItem: ({ userId, productId, quantity }) => {
       if (quantity <= 0) {
         fail(grpc.status.INVALID_ARGUMENT, "quantity must be positive");

@@ -14,6 +14,7 @@ export interface Product {
   type: string;
   /** Missing when the product has no price yet; only admins get those. */
   priceCents?: number;
+  imageUrl: string;
   description: string;
   card?: {
     setCode: string;
@@ -41,8 +42,41 @@ export interface SearchProductsRequest {
   maxPriceCents?: number;
   gradedOnly?: boolean;
   includeUnpriced?: boolean;
+  unpricedOnly?: boolean;
   page?: number;
   pageSize?: number;
+}
+
+export interface CardDetails {
+  setCode: string;
+  setName: string;
+  number: string;
+  rarity: string;
+  language: string;
+  supertype: string;
+  types: string[];
+  condition: string;
+  grading?: { company: string; grade: string } | null;
+}
+
+/** validateOnly checks the request (duplicates and imported cards too) without writing. */
+export interface CreateProductRequest {
+  name: string;
+  type: string;
+  priceCents?: number;
+  imageUrl?: string;
+  description?: string;
+  card?: CardDetails;
+  sealed?: { setCode: string; setName: string; language: string };
+  validateOnly?: boolean;
+}
+
+export interface UpdateProductRequest {
+  id: string;
+  name?: string;
+  imageUrl?: string;
+  description?: string;
+  validateOnly?: boolean;
 }
 
 export interface StockLevel {
@@ -104,6 +138,9 @@ export interface GrpcClients {
   catalog: {
     getProducts(request: { ids: string[]; includeUnpriced?: boolean }): Promise<{ products: Product[] }>;
     searchProducts(request: SearchProductsRequest): Promise<{ products: Product[]; totalCount: number }>;
+    setProductPrice(request: { id: string; priceCents?: number; validateOnly?: boolean }): Promise<Product>;
+    createProduct(request: CreateProductRequest): Promise<Product>;
+    updateProduct(request: UpdateProductRequest): Promise<Product>;
   };
   inventory: {
     getStocks(request: { productIds: string[] }): Promise<{ stocks: StockLevel[] }>;
@@ -113,6 +150,7 @@ export interface GrpcClients {
     getCart(request: { userId: string }): Promise<Cart>;
     addCartItem(request: { userId: string; productId: string; quantity: number }): Promise<Cart>;
     updateCartItem(request: { userId: string; productId: string; quantity: number }): Promise<Cart>;
+    clearCart(request: { userId: string }): Promise<Cart>;
     checkout(request: { userId: string; userEmail: string; shippingAddress: Address }): Promise<Order>;
     getOrder(request: { userId: string; orderId: string }): Promise<Order>;
     listOrders(request: { userId: string; page: number; pageSize: number }): Promise<{ orders: Order[]; totalCount: number }>;

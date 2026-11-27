@@ -1,8 +1,15 @@
 import type { Identity } from "../auth.js";
-import { listLowStock, setStock } from "./admin.js";
+import {
+  createCardListing,
+  createSealedProduct,
+  listLowStock,
+  setProductPrice,
+  setStock,
+  updateProduct,
+} from "./admin.js";
 import { checkStock, getProducts, searchProducts } from "./catalog.js";
 import type { Tool } from "./define.js";
-import { addToCart, checkout, getCart, getOrder, listNotifications, listOrders, updateCartItem } from "./orders.js";
+import { addToCart, checkout, clearCart, getCart, getOrder, listNotifications, listOrders, updateCartItem } from "./orders.js";
 
 const TOOLS: Tool<any>[] = [
   searchProducts,
@@ -11,12 +18,17 @@ const TOOLS: Tool<any>[] = [
   getCart,
   addToCart,
   updateCartItem,
+  clearCart,
   checkout,
   getOrder,
   listOrders,
   listNotifications,
   listLowStock,
   setStock,
+  setProductPrice,
+  updateProduct,
+  createSealedProduct,
+  createCardListing,
 ];
 
 export function toolsFor(identity: Identity): Tool<any>[] {

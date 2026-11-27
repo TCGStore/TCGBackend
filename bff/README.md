@@ -41,8 +41,10 @@ argumentos de la consulta: un cliente no puede pedir el carrito o los pedidos de
   aparece en la lista y `product(id)` devuelve `null`.
 - **Admins (el staff)** ven todo; los productos sin precio llegan con `priceCents: null`.
   Con `filter: { unpricedOnly: true }` ven solo los que esperan precio, y se lo ponen con
-  `setProductPrice`. Solo se puede con producto sellado: el precio de las cartas viene
-  del import de pokemontcg.io (ver TCGCatalogService).
+  `setProductPrice`. No se puede con las cartas importadas: su precio viene del import
+  de pokemontcg.io (ver TCGCatalogService).
+- Crear y editar productos todavía no tiene mutación propia: el admin lo hace con el
+  agente (`chat` + `confirmAction`, que devuelve `product` en las acciones de catálogo).
 
 ```graphql
 query { products(filter: { unpricedOnly: true }) { items { id name type } } }
