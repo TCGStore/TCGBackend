@@ -16,15 +16,17 @@ const CLIENT_ERRORS: Record<number, string> = {
   503: "SERVICE_UNAVAILABLE",
 };
 
+export type ActionKind = "checkout" | "set_stock" | "set_product_price" | "update_product" | "create_product";
+
 export interface ConfirmedAction {
-  kind: "checkout" | "set_stock";
+  kind: ActionKind;
   result: { id?: string; product_id?: string };
 }
 
 export interface ChatReply {
   conversationId: string;
   reply: string;
-  actions: { actionId: string; kind: "checkout" | "set_stock"; summary: string; expiresAt: string }[];
+  actions: { actionId: string; kind: ActionKind; summary: string; expiresAt: string }[];
 }
 
 /** REST client for the mcp-server. It forwards the user's JWT, which the mcp-server verifies again. */

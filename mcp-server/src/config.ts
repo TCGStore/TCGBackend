@@ -1,3 +1,6 @@
+const EFFORTS = ["low", "medium", "high", "xhigh", "max"] as const;
+export type Effort = (typeof EFFORTS)[number];
+
 export interface Config {
   port: number;
   jwtSecret: string;
@@ -6,6 +9,8 @@ export interface Config {
   /** Without it /chat answers 503; the MCP tools still work. */
   anthropicApiKey: string | undefined;
   anthropicModel: string;
+  /** Lower is faster and terser; raise it if deck building answers get worse. */
+  anthropicEffort: Effort;
   targets: {
     catalog: string;
     orders: string;
@@ -23,6 +28,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     grpcDeadlineMs: Number(env.GRPC_DEADLINE_MS ?? 5000),
     anthropicApiKey: env.ANTHROPIC_API_KEY || undefined,
     anthropicModel: env.ANTHROPIC_MODEL || "claude-opus-5-5",
+    anthropicEffort: effort(env.ANTHROPIC_EFFORT),
     targets: {
       catalog: env.CATALOG_GRPC_TARGET ?? "localhost:50051",
       orders: env.ORDERS_GRPC_TARGET ?? "localhost:50052",
@@ -39,4 +45,14 @@ function required(env: NodeJS.ProcessEnv, key: string, example: string): string 
     throw new Error(`${key} is required, e.g. ${example}`);
   }
   return value;
+}
+
+function effort(value: string | undefined): Effort {
+  if (!value) {
+    return "low";
+  }
+  if (!(EFFORTS as readonly string[]).includes(value)) {
+    throw new Error(`ANTHROPIC_EFFORT must be one of ${EFFORTS.join(", ")}`);
+  }
+  return value as Effort;
 }

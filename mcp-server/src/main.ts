@@ -10,7 +10,7 @@ import { createGrpcClients } from "./grpc.js";
 const config = loadConfig();
 const grpc = createGrpcClients(config);
 const agent = config.anthropicApiKey
-  ? new Agent(new Anthropic({ apiKey: config.anthropicApiKey }), config.anthropicModel)
+  ? new Agent(new Anthropic({ apiKey: config.anthropicApiKey }), config.anthropicModel, config.anthropicEffort)
   : null;
 if (!agent) {
   console.warn("ANTHROPIC_API_KEY is not set: /chat will answer 503");

@@ -58,12 +58,12 @@ type Mutation {
   "Requires an admin. Sets the units available for sale."
   setStock(productId: ID!, available: Int!): Stock!
   """
-  Requires an admin. Prices a sealed product (pack or box), which makes it visible to
-  customers. priceCents must be positive. FAILED_PRECONDITION for cards: their price
-  comes from the pokemontcg.io import.
+  Requires an admin. Prices a sealed product or a card listing created by the staff,
+  which makes it visible to customers. priceCents must be positive. FAILED_PRECONDITION
+  for imported cards: their price comes from the pokemontcg.io import.
   """
   setProductPrice(productId: ID!, priceCents: Int!): Product!
-  "Requires an admin. Removes the price of a sealed product, hiding it from customers."
+  "Requires an admin. Removes the price of a product, hiding it from customers."
   removeProductPrice(productId: ID!): Product!
 
   """
@@ -74,7 +74,7 @@ type Mutation {
   """
   chat(message: String!, conversationId: ID): ChatReply!
   """
-  Requires login. Runs a purchase or stock change that the assistant prepared; call it
+  Requires login. Runs a purchase or catalog change that the assistant prepared; call it
   from the "Confirm" button. Each action runs once and expires after 10 minutes
   (NOT_FOUND after that). FAILED_PRECONDITION if the cart changed in between: ask
   the assistant to prepare it again.
@@ -332,6 +332,12 @@ enum ActionKind {
   CHECKOUT
   "Admins only."
   SET_STOCK
+  "Admins only."
+  SET_PRODUCT_PRICE
+  "Admins only."
+  UPDATE_PRODUCT
+  "Admins only. Can also set the initial stock."
+  CREATE_PRODUCT
 }
 
 type ConfirmedAction {
@@ -340,13 +346,15 @@ type ConfirmedAction {
   order: Order
   "Set when kind is SET_STOCK."
   stock: Stock
+  "Set when kind is SET_PRODUCT_PRICE, UPDATE_PRODUCT or CREATE_PRODUCT."
+  product: Product
 }
 
 type ChatReply {
   "Send it back in the next message to continue the same conversation."
   conversationId: ID!
   reply: String!
-  "Purchases or stock changes prepared in this reply: show a \"Confirm\" button for each."
+  "Purchases or catalog changes prepared in this reply: show a \"Confirm\" button for each."
   actions: [PendingAction!]!
 }
 

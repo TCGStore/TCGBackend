@@ -58,6 +58,7 @@ beforeAll(async () => {
     grpcDeadlineMs: 2000,
     anthropicApiKey: undefined,
     anthropicModel: "claude-opus-5-5",
+    anthropicEffort: "low",
     targets: Object.fromEntries(
       ["catalog", "orders", "inventory", "users", "notifications"].map((name) => [name, services.target]),
     ) as any,
@@ -102,9 +103,17 @@ describe("access", () => {
     const admin = (await (await connect(tokenFor("admin"))).listTools()).tools.map((tool) => tool.name);
 
     expect(customer).toContain("search_products");
-    expect(customer).not.toContain("set_stock");
-    expect(customer).not.toContain("list_low_stock");
-    expect(admin).toEqual(expect.arrayContaining(["set_stock", "list_low_stock"]));
+    expect(customer).toContain("clear_cart");
+    const adminOnly = [
+      "set_stock",
+      "list_low_stock",
+      "set_product_price",
+      "update_product",
+      "create_sealed_product",
+      "create_card_listing",
+    ];
+    expect(customer.filter((name) => adminOnly.includes(name))).toEqual([]);
+    expect(admin).toEqual(expect.arrayContaining(adminOnly));
   });
 });
 
@@ -168,6 +177,13 @@ describe("cart and orders", () => {
 
     const missing = await call(client, "get_order", { order_id: "ord_x" });
     expect(missing).toMatchObject({ isError: true, text: "order not found" });
+  });
+
+  it("empties the cart without asking for confirmation", async () => {
+    const client = await connect(tokenFor("customer"));
+    await call(client, "add_to_cart", { product_id: "prd_box" });
+
+    expect((await call(client, "clear_cart")).json()).toEqual({ items: [], total_usd: 0 });
   });
 
   it("only buys after the user confirms through REST, once", async () => {
@@ -237,5 +253,69 @@ describe("admin tools", () => {
     expect(cancelled.status).toBe(200);
     expect((await postAction(`/actions/${pending.actionId}/confirm`, token)).status).toBe(404);
     expect(callsTo("InventoryService.SetStock")).toHaveLength(0);
+  });
+
+  it("creates a graded copy of a card with price and stock behind one button", async () => {
+    const token = tokenFor("admin");
+    const client = await connect(token);
+    const pending = (
+      await call(client, "create_card_listing", {
+        from_product_id: "prd_blastoise",
+        grading: { company: "PSA", grade: "9" },
+        price_usd: 45,
+        initial_stock: 1,
+      })
+    ).json();
+
+    expect(pending).toMatchObject({ kind: "create_product", summary: "Create Blastoise ex at $45.00, 1 unit(s)" });
+    const [check] = callsTo("CatalogService.CreateProduct");
+    expect(check!.request).toMatchObject({
+      validateOnly: true,
+      priceCents: 4500,
+      card: { setCode: "MEW", number: "009/165", condition: "CARD_CONDITION_NEAR_MINT", grading: { company: "PSA", grade: "9" } },
+    });
+
+    const confirmed = await postAction(`/actions/${pending.actionId}/confirm`, token);
+    expect(confirmed.body).toMatchObject({ kind: "create_product", result: { product_id: "prd_new", product: { available: 1 } } });
+    expect(callsTo("CatalogService.CreateProduct")[1]!.request.validateOnly).toBe(false);
+    expect(callsTo("InventoryService.SetStock")[0]!.request).toMatchObject({ productId: "prd_new", available: 1 });
+  });
+
+  it("reports a duplicate product before showing a button", async () => {
+    const client = await connect(tokenFor("admin"));
+    const result = await call(client, "create_sealed_product", {
+      name: "Obsidian Flames Booster Box",
+      type: "BOOSTER_BOX",
+      set_code: "OBF",
+      set_name: "Obsidian Flames",
+    });
+
+    expect(result).toMatchObject({ isError: true, text: 'product "prd_obf_box_en" already exists' });
+  });
+
+  it("prices, hides and edits products only after confirmation", async () => {
+    const token = tokenFor("admin");
+    const client = await connect(token);
+
+    const price = (await call(client, "set_product_price", { product_id: "prd_etb", price_usd: 59.99 })).json();
+    const hide = (await call(client, "set_product_price", { product_id: "prd_box", price_usd: null })).json();
+    const edit = (await call(client, "update_product", { product_id: "prd_box", description: "" })).json();
+
+    expect(price.summary).toBe("Set price of 151 Elite Trainer Box from no price to $59.99");
+    expect(hide.summary).toBe("Hide Obsidian Flames Booster Box (remove its price, now $149.99)");
+    expect(edit.summary).toBe("Update Obsidian Flames Booster Box: description");
+    expect(callsTo("CatalogService.SetProductPrice").every((c) => c.request.validateOnly)).toBe(true);
+
+    await postAction(`/actions/${edit.actionId}/confirm`, token);
+    // An empty description must reach the service as set, so it removes the field.
+    expect(callsTo("CatalogService.UpdateProduct").at(-1)!.request).toMatchObject({ description: "", validateOnly: false });
+    expect(callsTo("CatalogService.UpdateProduct").at(-1)!.request._description).toBe("description");
+  });
+
+  it("explains that imported cards can't be edited by hand", async () => {
+    const client = await connect(tokenFor("admin"));
+    const result = await call(client, "set_product_price", { product_id: "prd_blastoise", price_usd: 5 });
+
+    expect(result).toMatchObject({ isError: true, text: '"prd_blastoise" is an imported card' });
   });
 });

@@ -56,6 +56,7 @@ beforeAll(async () => {
     grpcDeadlineMs: 2000,
     anthropicApiKey: undefined,
     anthropicModel: "claude-opus-5-5",
+    anthropicEffort: "low",
     targets: Object.fromEntries(
       ["catalog", "orders", "inventory", "users", "notifications"].map((name) => [name, services.target]),
     ) as any,
@@ -118,6 +119,35 @@ describe("POST /chat", () => {
 
     const confirmed = await post(`/actions/${body.actions[0].actionId}/confirm`, token);
     expect(confirmed).toMatchObject({ status: 200, body: { kind: "checkout", result: { status: "PENDING" } } });
+  });
+
+  it("gives customers and admins different instructions and tools", async () => {
+    claude.replies.push(text("¡Hola!"), text("Hola, ¿qué revisamos?"));
+
+    await post("/chat", tokenFor("customer"), { message: "hola" });
+    await post("/chat", tokenFor("admin"), { message: "hola" });
+
+    const [customer, admin] = claude.requests;
+    expect(customer.system).toContain("shopping assistant");
+    expect(customer.system).not.toContain("set_stock");
+    expect(admin.system).toContain("staff assistant");
+    expect(admin.tools.map((tool: any) => tool.name)).toEqual(expect.arrayContaining(["list_low_stock", "set_stock"]));
+  });
+
+  it("lets an admin prepare a stock change that only runs when confirmed", async () => {
+    claude.replies.push(
+      toolUse("set_stock", { product_id: "prd_box", available: 10 }),
+      text("Preparé el cambio: presiona Confirmar."),
+    );
+    const token = tokenFor("admin");
+
+    const { body } = await post("/chat", token, { message: "deja 10 booster boxes de Obsidian Flames" });
+
+    expect(body.actions[0]).toMatchObject({ kind: "set_stock", details: { current_available: 2, new_available: 10 } });
+    expect(services.calls.filter((c) => c.method === "InventoryService.SetStock")).toHaveLength(0);
+
+    const confirmed = await post(`/actions/${body.actions[0].actionId}/confirm`, token);
+    expect(confirmed).toMatchObject({ status: 200, body: { kind: "set_stock", result: { available: 10 } } });
   });
 
   it("sends tool errors to Claude so it can explain them", async () => {

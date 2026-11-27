@@ -5,6 +5,7 @@ import type { AddressInfo } from "node:net";
 const ACTIONS: Record<string, { status: number; body: object }> = {
   act_checkout: { status: 200, body: { kind: "checkout", result: { id: "ord_1", status: "PENDING" } } },
   act_stock: { status: 200, body: { kind: "set_stock", result: { product_id: "prd_etb", available: 3 } } },
+  act_create: { status: 200, body: { kind: "create_product", result: { product_id: "prd_etb", product: {} } } },
   act_changed: { status: 409, body: { error: "the cart changed after the purchase was prepared: prepare it again" } },
 };
 

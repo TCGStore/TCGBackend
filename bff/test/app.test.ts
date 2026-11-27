@@ -155,10 +155,10 @@ describe("catalog", () => {
     const { data } = await gql(`mutation { removeProductPrice(productId: "prd_etb") { priceCents } }`, { token: tokenFor("admin") });
 
     expect(data.removeProductPrice).toEqual({ priceCents: null });
-    expect(callsTo("CatalogService.SetProductPrice")[0]!.request).toEqual({ id: "prd_etb" });
+    expect(callsTo("CatalogService.SetProductPrice")[0]!.request).toEqual({ id: "prd_etb", validateOnly: false });
   });
 
-  it("refuses to price a card", async () => {
+  it("refuses to price an imported card", async () => {
     const { errors } = await gql(`mutation { setProductPrice(productId: "prd_pikachu", priceCents: 100) { id } }`, {
       token: tokenFor("admin"),
     });
@@ -334,6 +334,16 @@ describe("assistant actions", () => {
     });
 
     expect(data.confirmAction).toEqual({ kind: "SET_STOCK", stock: { productId: "prd_etb", available: 3 } });
+  });
+
+  it("returns the product after a catalog change, even if it has no price yet", async () => {
+    const { data, errors } = await gql(`mutation { confirmAction(actionId: "act_create") { kind product { id } } }`, {
+      token: tokenFor("admin"),
+    });
+
+    expect(errors).toBeUndefined();
+    expect(data.confirmAction).toEqual({ kind: "CREATE_PRODUCT", product: { id: "prd_etb" } });
+    expect(callsTo("CatalogService.GetProduct")[0]!.request).toMatchObject({ id: "prd_etb", includeUnpriced: true });
   });
 
   it("maps mcp-server errors to GraphQL codes", async () => {
